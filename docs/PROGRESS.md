@@ -8,7 +8,7 @@ Current milestone: M2 conversational AI; live Gemini flow verified. No ZEIL bonu
 | 03 | PASS | `4aaae34` | Typecheck, 9 unit groups, production build, browser smoke at 1280px/320px, genuine Gemini extraction/follow-up PASS | — |
 | 04 | PASS | `8372517` (sensitive-screen follow-up) | `npm run typecheck`, `npm test` (16 test cases), `npm run build`, browser smoke at 1280px/320px, genuine Gemini application draft with input/output semantic screens PASS | Automated semantic screening can still make false negatives; candidate review remains required |
 | 05 | PASS | `251e75b` | `npm run typecheck`, `npm test` (18 cases), `npm run build`, mocked browser smoke at 1280px/320px | Full screen-reader and 200% zoom audit remains Task 06 |
-| 06 | PARTIAL (browser verification; manual screen-reader check outstanding) | `59c7ecd` | `npm run typecheck`, `npm test` (18), `npm run build`, `npm run test:browser` at 320/640/1280, genuine simple/standard Gemini starts PASS | No VoiceOver/NVDA session available; 640 CSS px emulates the reflow width at 200% zoom but is not a browser zoom control test |
+| 06 | PARTIAL (browser verification; manual screen-reader check outstanding) | `0630dc8` | `npm run typecheck`, `npm test` (18), `npm run build`, `npm run test:browser` at 320/640/1280, genuine simple/standard Gemini starts PASS | No VoiceOver/NVDA session available; 640 CSS px emulates the reflow width at 200% zoom but is not a browser zoom control test |
 | 07 | TODO | — | — | — |
 | 08 | TODO | — | — | — |
 | 09 | TODO | — | — | — |
