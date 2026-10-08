@@ -6,7 +6,7 @@
 Read `AGENTS.md`, `docs/MASTER_SPEC.md`, `docs/PROGRESS.md`, the relevant docs for this task. Avoid loading unrelated documents.
 
 ## Scope
-Implement safe browser localStorage state with versioned key and validation. Explicit Reset & Delete. Functional text downloads for CV and letter, correct filenames, edited preview exported, accessible feedback. No storage of keys. Gate: reload preserves candidate choices; reset clears; download contains edits. No new dependency if browser APIs suffice.
+Implement safe browser localStorage state with a versioned key and validation. Persist only candidate-approved profile data and explicit communication/display preferences, including simple/standard question style and high contrast, large text, and reduced motion. Keep API keys out of storage. Provide explicit Reset & Delete. Functional text downloads for CV and letter, correct filenames, edited preview exported, and accessible download feedback. Gate: reload preserves chosen preferences and candidate-approved data; reset clears them; download contains user edits and excludes unconfirmed and automatically withheld sensitive information. No new dependency if browser APIs suffice.
 
 ## Strict procedure
 1. Inspect existing code and run existing checks before modifications.

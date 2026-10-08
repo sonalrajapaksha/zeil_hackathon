@@ -6,7 +6,7 @@
 Read `AGENTS.md`, `docs/MASTER_SPEC.md`, `docs/PROGRESS.md`, the relevant docs for this task. Avoid loading unrelated documents.
 
 ## Scope
-Extend conversation structured output so suggested career claims have evidence and start unconfirmed. Add Living Career Canvas proposal cards with approve/edit/delete. CandidateProfile type is authoritative. Show visibly where claims came from. Never save inferred disability or automatic user qualification judgments. Gate: edited confirmed skill appears in profile; unconfirmed skill is not included in confirmed selector. Ensure mobile/keyboard.
+Extend conversation structured output so suggested career claims have evidence and start unconfirmed. Add Living Career Canvas proposals with approve/edit/remove. CandidateProfile type is authoritative. Show each claim's source visibly. Candidates control every proposal; clarification requests are not profile evidence. Never save inferred disability or medical conditions, make automatic qualification judgments, or automatically disclose sensitive information in application materials. Access is for everyone and must not presume an access need. Gate: edited and approved skill appears in the confirmed profile; unconfirmed skill is excluded; removal works; source evidence is visible; keyboard/mobile controls work.
 
 ## Strict procedure
 1. Inspect existing code and run existing checks before modifications.

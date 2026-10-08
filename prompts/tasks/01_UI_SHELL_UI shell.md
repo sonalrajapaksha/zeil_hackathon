@@ -6,7 +6,7 @@
 Read `AGENTS.md`, `docs/MASTER_SPEC.md`, `docs/PROGRESS.md`, the relevant docs for this task. Avoid loading unrelated documents.
 
 ## Scope
-Build the 3 screen shell (welcome, conversation + Living Career Canvas, job + application preview) using realistic DEMO_JOBS and candidate seed data. Make functional navigation and large-text/high-contrast toggles. Keep server untouched. Use docs/DESIGN.md and docs/ACCESSIBILITY.md. No fake AI chat masquerading as real; placeholder clearly marked demo. Add reusable CSS/tokens, responsive layout. Gate: user can navigate all 3 screens, all controls have actions, desktop/mobile layouts reasonable. Run typecheck/build.
+Build the 3 screen shell (welcome, conversation + Living Career Canvas, job + application preview) using realistic DEMO_JOBS and candidate seed data. Position Access as an accessibility-first AI career companion designed with people facing access barriers in mind and available to everyone; it is not a disability assessment or hiring system. Keep text interaction complete and always available. Make functional large-text/high-contrast/reduced-motion controls and an explicit simple/standard question-style choice. Do not infer or preselect access needs. Keep server untouched. Use docs/DESIGN.md and docs/ACCESSIBILITY.md. No fake AI chat masquerading as real; placeholder clearly marked demo. Add responsive layout. Gate: all 3 screens and controls work; keyboard navigation and access preferences are clear; desktop/mobile layouts are usable. Run typecheck/build.
 
 ## Strict procedure
 1. Inspect existing code and run existing checks before modifications.

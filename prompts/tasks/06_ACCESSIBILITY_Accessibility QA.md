@@ -6,7 +6,7 @@
 Read `AGENTS.md`, `docs/MASTER_SPEC.md`, `docs/PROGRESS.md`, the relevant docs for this task. Avoid loading unrelated documents.
 
 ## Scope
-Use docs/ACCESSIBILITY.md as checklist. Audit and fix semantic structure, focus order/visibility, keyboard-only full user journey, live regions, form errors, zoom 200%, 320px width, motion preference, reading-size and high-contrast toggles. Aim WCAG 2.2 AA; don't claim certification. Gate: record actual keyboard and viewport verification, known gaps. Do not strip functionality.
+Use docs/ACCESSIBILITY.md as checklist. Access serves everyone with an accessibility-first design. Audit and fix semantic structure, focus order/visibility, keyboard-only full journey, screen-reader announcements, accessible form/API errors, zoom 200%, 320px and 1280px widths, reduced motion, large text, and functional high contrast. Verify the simple/standard question-style choice and its effect on Gemini output. Verify skip and clarification behavior, including that a clarification request is not extracted as profile evidence. Confirm text completes the full flow regardless of optional voice state. Aim toward WCAG 2.2 AA; report test evidence and gaps without claiming certification. Gate: record actual keyboard, screen-reader, settings, error, and viewport verification. Do not strip functionality.
 
 ## Strict procedure
 1. Inspect existing code and run existing checks before modifications.

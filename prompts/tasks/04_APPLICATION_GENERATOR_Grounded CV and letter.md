@@ -6,7 +6,7 @@
 Read `AGENTS.md`, `docs/MASTER_SPEC.md`, `docs/PROGRESS.md`, the relevant docs for this task. Avoid loading unrelated documents.
 
 ## Scope
-Build job picker from fictional DEMO_JOBS. Implement /api/application validating request and looking up server-side job by id. Use ONLY confirmed candidate experience in the prompt; generate CV text and tailored letter, with unverifiedClaims list when grounding uncertain. Editable preview. AI must not invent credentials. Gate: job switching changes application; unconfirmed claims excluded; error handling present. Avoid fake match scores.
+Build job picker from fictional DEMO_JOBS. Implement /api/application validating request and looking up server-side job by id. Use only confirmed, job-relevant candidate evidence; generate an editable CV and tailored letter with `unverifiedClaims` when grounding is uncertain. Never invent credentials. Never automatically include sensitive personal, disability, or medical information, even if it appeared in the interview or profile; do not ask for it. Preserve candidate review/edit control and accessible error recovery. Gate: job switching changes the application; unconfirmed and sensitive claims are excluded; errors preserve user content and are announced accessibly. Avoid fake match scores.
 
 ## Strict procedure
 1. Inspect existing code and run existing checks before modifications.

@@ -6,7 +6,7 @@
 Read `AGENTS.md`, `docs/MASTER_SPEC.md`, `docs/PROGRESS.md`, the relevant docs for this task. Avoid loading unrelated documents.
 
 ## Scope
-Invoke actual Impeccable if installed; otherwise use project design skill and docs/DESIGN.md. Give Access unique editorial identity: bold ZEIL-adjacent violet, warm ivory, near-black and restrained lime. Focus on conversation→career canvas wow moment. Improve rhythm, labels, feedback states, motion only with reduced-motion fallback. Use bounded screenshot review: desktop + mobile, single batched fixes, one confirm. Gate: no generic nested-card SaaS; no regressions; keep all controls accessible.
+Invoke actual Impeccable if installed; otherwise use project design skill and docs/DESIGN.md. Preserve Access's existing identity: bold ZEIL-adjacent violet, warm ivory, near-black, and restrained lime. Access is an accessibility-first career companion for everyone; keep communication choices, text controls, errors, and access settings clear and usable without changing the visual world. Focus on conversation→career canvas. Improve rhythm, labels, feedback states, and purposeful motion with reduced-motion support. Use bounded screenshot review: desktop + mobile, single batched fixes, one confirm. Gate: no generic nested-card SaaS; no regressions; every control remains keyboard- and screen-reader-accessible.
 
 ## Strict procedure
 1. Inspect existing code and run existing checks before modifications.

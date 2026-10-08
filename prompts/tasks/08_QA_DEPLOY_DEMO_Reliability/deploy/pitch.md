@@ -6,7 +6,7 @@
 Read `AGENTS.md`, `docs/MASTER_SPEC.md`, `docs/PROGRESS.md`, the relevant docs for this task. Avoid loading unrelated documents.
 
 ## Scope
-Feature freeze. Run typecheck, build, manual end-to-end flow, invalid/no-key handling, keyboard and mobile tests. Deploy only with explicit platform access and permission; otherwise document exact Vercel deployment steps and env vars. Prepare three-minute pitch from docs/DEMO.md, reset procedure and explicitly labelled fallback. Commit final state; don't push without approval. Report tests precisely and remaining risks. Gate: working live journey and a demo-safe fallback with honest provenance.
+Feature freeze. Run typecheck, build, manual end-to-end flow, invalid/no-key handling, keyboard, screen-reader, mobile, and access-preference tests. Deploy only with explicit platform access and permission; otherwise document exact Vercel deployment steps and env vars. Prepare the accessibility-first, universally usable three-minute pitch from docs/DEMO.md, reset procedure, and explicitly labelled fallback. Do not stage unavailable preferences or claim unverified accessibility behavior. Commit final state; don't push without approval. Report tests precisely and remaining risks. Gate: working text-first candidate-controlled journey, verified accessibility evidence, and a demo-safe fallback with honest provenance.
 
 ## Strict procedure
 1. Inspect existing code and run existing checks before modifications.

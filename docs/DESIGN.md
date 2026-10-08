@@ -2,6 +2,8 @@
 
 Inspired by ZEIL's energetic purple and people-first brand but NOT an official ZEIL product or identity. Distinct editorial futurism; premium warm, approachable, high-legibility aesthetic.
 
+Product position: an accessibility-first AI career companion designed with people who face accessibility barriers in mind and available to everyone. Keep this editorial visual identity; accessibility is expressed through real user controls and robust interaction, not a separate or restricted mode.
+
 Tokens: violet #8052FF, ivory #F7F5F0, ink #17151D, lilac #C2AFFC, lime #D8FF74 (success only). Check WCAG contrast and adjust actual text pairings; don't blindly use accents for small text.
 
 Typography: Space Grotesk for display if available, accessible system sans/Inter for body; fallback fonts must work offline. Headline oversized; body >=16px, line height ~1.5.
@@ -9,6 +11,8 @@ Typography: Space Grotesk for display if available, accessible system sans/Inter
 Primary layout: large editorial welcome; accessible conversation workspace where Living Career Canvas grows; structured application preview. Desktop split view (conversation ~55%, canvas ~45%); mobile stacked tabs. Reserve space for loading to prevent layout shift.
 
 Interactions: 180–250ms transitions respecting reduced motion; one striking progress transformation; obvious focus rings; generous 44px touch targets; keyboard-first navigation.
+
+Expose simple/standard question wording and high-contrast, large-text, and reduced-motion controls as clear, functional preferences. Keep text as the complete baseline interaction. Voice is optional only when implemented, and must never replace text controls. Labels, focus, errors, and screen-reader announcements belong to the visual system as much as color and type.
 
 Do not: use generic nested cards, fake animations, excessive gradients, unreadable lilac-on-purple copy, dark-pattern disclosures, meaningless match percentages, tiny controls, interface that only works with voice.
 

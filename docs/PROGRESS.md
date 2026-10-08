@@ -50,3 +50,19 @@ When completing a task record: actual changed files, exact test commands/outcome
 - Setup/reproducible checks: see `docs/TASK02_SETUP.md`. Native TypeScript test execution requires Node 22.18+; verified on Node 26.7.0. Playwright was installed in the external npm tool cache only, not added as a repository dependency.
 - Remaining: continue qualitative review of live model behavior. Exact repetition is rejected; semantic repetition/fabrication/sensitive-inference constraints are prompt-based and still require live qualitative review. Public deployment/rate limiting and full accessibility audit remain their existing later tasks.
 - Stop here. Next eligible task is Task 03 pending-profile approval, only after the live M2 gate passes and the user approves it.
+
+## Accessibility-first positioning update (documentation only, 2026-10-09)
+
+The product documentation and task prompts now define Access as an accessibility-first AI career companion, designed with people facing access barriers in mind and available to everyone. This update does not change the historical PASS/TODO results above or claim that new requirements have been implemented or verified.
+
+New implementation follow-ups:
+
+- **Task 01:** add an explicit, changeable Simple/Standard question-style choice and update onboarding copy to say Access is for everyone. Existing display preference controls still require functional verification as recorded under Task 06.
+- **Task 02:** pass only the explicit question style needed by Gemini; verify one question at a time, simple/standard wording, skip, and clarification. A clarification request must be answered and the pending question restated without treating that request as candidate experience. Add safe, accessible recovery without losing user text.
+- **Task 03/04:** preserve candidate review and approval. Ensure sensitive personal, disability, or medical information is never automatically included in CVs or letters, even if volunteered or present in a confirmed profile. No diagnosis prompts, inferred needs, or employability judgments.
+- **Task 05:** persist explicit communication and display preferences with validated candidate data; keep secrets out of storage and verify reset clears the state.
+- **Task 06:** verify keyboard and screen-reader journeys, concise announcements, accessible errors, Simple/Standard behavior, 320px and 1280px, 200% zoom, high contrast, large text, reduced motion, and sensitive-information exclusion. Report actual outcomes; do not claim WCAG compliance without evidence.
+- **Task 08:** use the revised accessibility-first demo scenario only for controls that are implemented and verified. Identify unfinished behavior as follow-up rather than staging it.
+- **Task 13:** Gemini Live remains optional stretch work; maintain a complete text fallback and never make voice necessary for the core flow.
+
+Before Task 04, address the documented Task 01/02 preference and clarification follow-ups; the earlier PASS rows remain historical results for the checks recorded at completion, not verification of these newly stated criteria. Task 04 remains the next numbered task after those prerequisites and separate approval. These are requirements within existing task numbering and scope, not new tasks.
