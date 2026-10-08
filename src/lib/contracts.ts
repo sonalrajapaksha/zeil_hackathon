@@ -66,6 +66,7 @@ export const InterviewProgressSchema = z.object({
 export const ConversationResponseSchema = z.object({
   reply: z.string().trim().min(1).max(700),
   suggestions: z.array(z.object({ kind:z.enum(['skill','experience','education']), text:z.string().trim().min(1).max(240), evidence:z.string().trim().min(1).max(400) }).strict()).max(5),
+  toolTrace: z.object({ selected:z.boolean(), functionName:z.string().nullable(), arguments:z.array(z.object({ kind:z.enum(['skill','experience','education']), text:z.string().trim().min(1).max(240), evidence:z.string().trim().min(1).max(400) }).strict()).max(5), dispatched:z.boolean(), outcome:z.enum(['no_tool_selected','pending_for_review','no_safe_items']) }).strict(),
   history: InterviewHistorySchema,
   interview: InterviewProgressSchema,
 }).strict();

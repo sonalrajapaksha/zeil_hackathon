@@ -118,7 +118,7 @@ export default function Home() {
       }
       if (request.action !== "clarify") setMessage("");
       setCorrectionId(null);
-      setAnnouncement(result.interview.status === "ended" ? "Interview ended. Your history is available for review." : result.suggestions.length ? `A new AI question and ${result.suggestions.length} profile suggestion${result.suggestions.length === 1 ? "" : "s"} to review are ready.` : "A new AI question is ready.");
+      setAnnouncement(result.interview.status === "ended" ? "Interview ended. Your history is available for review." : result.toolTrace.selected ? `Gemini selected the profile update tool. ${result.toolTrace.arguments.length} validated suggestion${result.toolTrace.arguments.length === 1 ? " is" : "s are"} ready for your review.` : result.suggestions.length ? `A new AI question and ${result.suggestions.length} profile suggestion${result.suggestions.length === 1 ? "" : "s"} to review are ready.` : "A new AI question is ready.");
       messageInput.current?.focus();
     } catch (failure) {
       if (activeRequest.current !== controller) return;

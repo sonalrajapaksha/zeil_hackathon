@@ -79,6 +79,68 @@ test('profile suggestions carry exact answer evidence and unsupported evidence f
   assert.equal((await rejected.json()).error.code, 'INVALID_RESPONSE');
 });
 
+test('Gemini-selected profile tool validates, deduplicates, dispatches pending evidence and returns strict JSON', async () => {
+  process.env.GEMINI_API_KEY = 'test-secret';
+  let step = 0;
+  const sdk = mock.method(globalThis, 'fetch', async (_url: unknown, init: RequestInit) => {
+    const body = JSON.parse(String(init.body));
+    step++;
+    if (step === 1) return new Response(JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ functionCall: {
+      name: 'propose_profile_updates', id: 'call-1', args: { items: [
+        { kind: 'experience', text: 'Library volunteering', evidence: 'volunteer at a library' },
+        { kind: 'experience', text: 'Library volunteering!', evidence: 'volunteer at a library' },
+      ] },
+    } }] }, finishReason: 'STOP' }] }), { headers: { 'Content-Type': 'application/json' } });
+    assert.equal(body.contents.at(-1).parts[0].functionResponse.name, 'propose_profile_updates');
+    assert.equal(body.contents.at(-1).parts[0].functionResponse.response.items.length, 1);
+    return new Response(JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify({ reply: 'What did you enjoy about helping library visitors?', suggestions: [] }) }] }, finishReason: 'STOP' }] }), { headers: { 'Content-Type': 'application/json' } });
+  });
+  const result = ConversationResponseSchema.parse(await (await POST(request({ action: 'answer', history: [question], answer: answer.content, questionStyle: 'simple' }))).json());
+  assert.equal(step, 2);
+  assert.deepEqual(result.suggestions, [{ kind: 'experience', text: 'Library volunteering', evidence: 'volunteer at a library' }]);
+  assert.deepEqual(result.toolTrace, { selected: true, functionName: 'propose_profile_updates', arguments: result.suggestions, dispatched: true, outcome: 'pending_for_review' });
+  assert.ok(!JSON.stringify(result).includes('test-secret'));
+  const selection = JSON.parse(String(sdk.mock.calls[0].arguments[1]!.body));
+  assert.equal(selection.toolConfig.functionCallingConfig.mode, 'AUTO');
+  assert.equal(selection.tools[0].functionDeclarations[0].name, 'propose_profile_updates');
+  const finalShape = JSON.parse(String(sdk.mock.calls[1].arguments[1]!.body)).generationConfig;
+  assert.equal(finalShape.responseMimeType, 'application/json');
+  assert.ok(finalShape.responseJsonSchema);
+});
+
+test('malformed or unsupported tool arguments fail closed; a model no-tool choice remains supported', async () => {
+  process.env.GEMINI_API_KEY = 'test-secret';
+  for (const call of [
+    { name: 'propose_profile_updates', args: { items: [{ kind: 'skill', text: 'Leadership', evidence: 'not in this answer' }] } },
+    { name: 'propose_profile_updates', args: { items: [{ kind: 'skill', text: 'Leadership', evidence: 'volunteer at a library', confirmed: true }] } },
+    { name: 'unknown_tool', args: {} },
+  ]) {
+    const bad = mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ functionCall: call }] }, finishReason: 'STOP' }] })));
+    const response = await POST(request({ action: 'answer', history: [question], answer: answer.content, questionStyle: 'standard' }));
+    assert.equal(response.status, 502);
+    assert.equal((await response.json()).error.code, 'INVALID_RESPONSE');
+    bad.mock.restore();
+  }
+  let step = 0;
+  const noTool = mock.method(globalThis, 'fetch', async (_url: unknown, init: RequestInit) => {
+    step++;
+    const body = JSON.parse(String(init.body));
+    if (step === 1) {
+      assert.equal(body.toolConfig.functionCallingConfig.mode, 'AUTO');
+      return new Response(JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ text: 'No new work-related claim is clear.' }] }, finishReason: 'STOP' }] }));
+    }
+    assert.ok(body.generationConfig.responseJsonSchema);
+    assert.equal(body.contents.at(-2).role, 'model');
+    assert.equal(body.contents.at(-1).role, 'user');
+    return new Response(JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify({ reply: 'What did you learn from volunteering?', suggestions: [] }) }] }, finishReason: 'STOP' }] }));
+  });
+  const result = ConversationResponseSchema.parse(await (await POST(request({ action: 'answer', history: [question], answer: 'I enjoyed my Saturday.', questionStyle: 'standard' }))).json());
+  assert.equal(step, 2);
+  assert.deepEqual(result.suggestions, []);
+  assert.deepEqual(result.toolTrace, { selected: false, functionName: null, arguments: [], dispatched: false, outcome: 'no_tool_selected' });
+  noTool.mock.restore();
+});
+
 test('skip is explicit; correction removes stale answers without mutating original history', async () => {
   fakeGemini();
   const skip = ConversationResponseSchema.parse(await (await POST(request({ action: 'skip', history: [question], questionStyle: 'standard' }))).json());

@@ -40,13 +40,17 @@ globalThis.fetch = async (_url, init) => {
       unverifiedClaims: [],
     }) }] }, finishReason: 'STOP' }] }));
   }
+  if (body.tools?.some((tool) => tool.functionDeclarations?.some((declaration) => declaration.name === 'propose_profile_updates'))) {
+    return new Response(JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ text: 'No profile tool needed in this deterministic browser fixture.' }] }, finishReason: 'STOP' }] }));
+  }
   const text = body.contents.at(-1).parts[0].text;
   const previousQuestion = [...body.contents.slice(0, -1)].reverse().find((item) => item.role === 'model')?.parts[0].text;
   const clarification = text.includes('requests clarification');
-  const reply = body.contents.length === 1 ? 'What experience would you like to share?' : clarification ? previousQuestion : `Thinking about ${text.slice(0, 70)}, what did you learn in example ${calls}?`;
-  const suggestions = text === 'I volunteer at a library.'
+  const candidateText = body.contents.filter((item) => item.role === 'user').map((item) => item.parts?.find((part) => part.text)?.text).findLast((value) => value === 'I volunteer at a library.' || value === 'I helped organise donations.') || text;
+  const reply = body.contents.length === 1 ? 'What experience would you like to share?' : clarification ? previousQuestion : `Thinking about ${candidateText.slice(0, 70)}, what did you learn in example ${calls}?`;
+  const suggestions = candidateText === 'I volunteer at a library.'
     ? [{ kind: 'skill', text: 'Library volunteering', evidence: 'volunteer at a library' }]
-    : text === 'I helped organise donations.'
+    : candidateText === 'I helped organise donations.'
       ? [{ kind: 'experience', text: 'Organising donations', evidence: 'organise donations' }]
       : [];
   return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ reply, suggestions }) }] }, finishReason: 'STOP' }] }));
