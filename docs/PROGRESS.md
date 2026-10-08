@@ -7,7 +7,7 @@ Current milestone: M2 conversational AI; live Gemini flow verified. No ZEIL bonu
 | 02 | PASS | `d0847e6` implementation; current follow-up fix in Git log | Typecheck, 8 mocked test groups, production build, desktop/mobile browser smoke, real Gemini start/follow-up/end PASS | — |
 | 03 | PASS | `4aaae34` | Typecheck, 9 unit groups, production build, browser smoke at 1280px/320px, genuine Gemini extraction/follow-up PASS | — |
 | 04 | PASS | `8372517` (sensitive-screen follow-up) | `npm run typecheck`, `npm test` (16 test cases), `npm run build`, browser smoke at 1280px/320px, genuine Gemini application draft with input/output semantic screens PASS | Automated semantic screening can still make false negatives; candidate review remains required |
-| 05 | TODO | — | — | — |
+| 05 | PASS | `062636a` | `npm run typecheck`, `npm test` (18 cases), `npm run build`, mocked browser smoke at 1280px/320px | Full screen-reader and 200% zoom audit remains Task 06 |
 | 06 | TODO | — | — | — |
 | 07 | TODO | — | — | — |
 | 08 | TODO | — | — | — |
@@ -85,3 +85,13 @@ Before Task 04, address the documented Task 01/02 preference and clarification f
 - **Genuine model check:** one server-route request to Gemini for the fictional Harbour Digital support role returned a validated package after both semantic screens. The input screen ran before generation and the output screen approved the documents; output remains candidate-reviewed and editable. No bonus claim was updated.
 - **Remaining limits:** screening combines deterministic phrase/contact checks with model-based semantic checks that fail closed on malformed or incomplete results. Semantic classifiers can still make false negatives, so candidate review remains required. Full screen-reader, 200% zoom, and functional display-preference audit remain Task 06 work.
 - **Next task:** Task 05, export and persistence. Stop after this task; do not begin Task 05 without a separate request.
+
+## Task 05 handoff
+
+- Implemented versioned `access-candidate-v1` localStorage persistence with Zod validation. Only the candidate name, confirmed profile claims (including their short evidence), and explicit question/display preferences are saved. Interview history, unapproved claims, generated drafts, and API secrets are not stored. Invalid versions/data are ignored and malformed payloads are cleared when possible. Storage failures leave the in-memory flow usable and are announced.
+- Added an always-available **Reset & delete** action to clear saved state and reset the current session. Updated privacy copy to identify the saved profile evidence and preferences.
+- Replaced the combined download with separate CV and cover-letter `.txt` exports. Each export uses the current editable text, a role-specific filename, and polite live feedback naming the downloaded file.
+- **Changed files:** `src/lib/persistence.ts`, `src/app/page.tsx`, `src/app/styles.css`, `tests/persistence.test.ts`, `tests/browser-smoke.mjs`, `docs/PROGRESS.md`. Existing user edits in `README.md` were left untouched and excluded from the Task 05 commit.
+- **Verification:** `npm run typecheck` PASS; `npm test` PASS (18 cases, including version/validation, confirmed-only storage and delete); `npm run build` PASS; `PLAYWRIGHT_MODULE=/Users/sonalrajapaksha/.npm/_npx/420ff84f11983ee5/node_modules/playwright/index.mjs ACCESS_TEST_URL=http://localhost:3005 npm run test:browser` PASS at 1280px and 320px. Browser flow verified simple/standard question choice and all three display preferences persist on reload, approved profile edits persist, unapproved suggestions and full interview answers are absent, edited CV/letter contents download under correct filenames with live feedback, reset removes the storage key, and no overflow/runtime errors occur. API model behavior in the browser smoke is stubbed; Task 04 separately recorded the genuine Gemini check.
+- The Impeccable detector reports the existing Space Grotesk font warning. Kept the font because it is explicitly specified in `docs/DESIGN.md`. Browser smoke is not a full screen-reader or 200% zoom audit; those checks remain Task 06.
+- **Next task:** Task 06 accessibility QA, only when separately requested. Stop here; do not begin another task.

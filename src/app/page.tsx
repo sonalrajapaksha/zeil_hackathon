@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { DEMO_JOBS } from "@/lib/jobs";
 import { ApplicationErrorSchema, ApplicationPackageSchema, CLARIFICATION_REQUEST, ConversationErrorSchema, ConversationResponseSchema, type ApplicationPackage, type CandidateProfile, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
 import { EMPTY_INTERVIEW, progress } from "@/lib/interview";
+import { deleteSavedProfile, loadSavedProfile, saveProfile } from "@/lib/persistence";
 
 type Step = "welcome" | "story" | "application";
 type ClaimKind = "skill" | "experience" | "education";
@@ -18,6 +19,7 @@ function Mark({ small = false }: { small?: boolean }) {
 export default function Home() {
   const [step, setStep] = useState<Step>("welcome");
   const [profile, setProfile] = useState<CandidateProfile>(emptyProfile);
+  const [storageReady, setStorageReady] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"conversation" | "canvas">("conversation");
   const [chat, setChat] = useState<ConversationMessage[]>([]);
   const [interview, setInterview] = useState(EMPTY_INTERVIEW);
@@ -26,11 +28,29 @@ export default function Home() {
   const [failedRequest, setFailedRequest] = useState<ConversationRequest | null>(null);
   const [correctionId, setCorrectionId] = useState<string | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
+  const skipNextPersist = useRef(false);
+  const storageFailureReported = useRef(false);
   const messageInput = useRef<HTMLTextAreaElement>(null);
   const chatLog = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (chatLog.current) chatLog.current.scrollTop = chatLog.current.scrollHeight;
   }, [chat]);
+  useEffect(() => {
+    const savedProfile = loadSavedProfile();
+    if (savedProfile) setProfile(savedProfile);
+    setStorageReady(true);
+  }, []);
+  useEffect(() => {
+    if (!storageReady) return;
+    if (skipNextPersist.current) {
+      skipNextPersist.current = false;
+      return;
+    }
+    if (!saveProfile(profile) && !storageFailureReported.current) {
+      storageFailureReported.current = true;
+      setAnnouncement("Your browser could not save this profile. You can continue, but it may not be here next time.");
+    }
+  }, [profile, storageReady]);
   const [message, setMessage] = useState("");
   const claims = useMemo<Claim[]>(() => [
     ...profile.skills.map((item) => ({ id: item.id, kind: "skill" as const, text: item.name, evidence: item.evidence, confirmed: item.confirmed })),
@@ -221,18 +241,23 @@ export default function Home() {
     }
   }
 
-  function downloadDraft() {
-    const blob = new Blob([`CURRICULUM VITAE\n\n${cv}\n\nCOVER LETTER\n\n${letter}\n\nDraft for ${selected.title} at ${selected.company}. Please review before use.`], { type: "text/plain;charset=utf-8" });
+  function downloadText(text: string, filename: string, label: string) {
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "access-application-draft.txt";
+    link.download = filename;
+    link.hidden = true;
+    document.body.append(link);
     link.click();
-    URL.revokeObjectURL(url);
-    setAnnouncement("Your application draft has been downloaded.");
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setAnnouncement(`${label} downloaded as ${filename}.`);
   }
 
   function reset() {
+    deleteSavedProfile();
+    skipNextPersist.current = true;
     activeRequest.current?.abort(); activeRequest.current = null;
     setPending(false); setError(""); setFailedRequest(null); setCorrectionId(null); setInterview(EMPTY_INTERVIEW);
     setStep("welcome"); setChat([]); setProfile(emptyProfile()); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setMobilePanel("conversation"); setCv(""); setLetter(""); setDraftJobId(null); setUnverifiedClaims([]); setApplicationError(""); setAnnouncement("Your session has been reset.");
@@ -245,7 +270,7 @@ export default function Home() {
         <a className="brand" href="#top" aria-label="Access home"><Mark /><span>access</span></a>
         <p className="top-note">A little more room to tell your story.</p>
         <div className="top-actions">
-          {step !== "welcome" && <button className="text-button reset-button" onClick={reset}>Reset session</button>}
+          <button className="text-button reset-button" onClick={reset}>Reset &amp; delete</button>
           <details className="preferences">
             <summary aria-label="Communication and display preferences"><span className="settings-glyph" aria-hidden="true">Aa</span><span className="pref-label">Preferences</span></summary>
             <div className="pref-menu">
@@ -256,7 +281,7 @@ export default function Home() {
               <label><input type="checkbox" checked={profile.preferences.largeText} onChange={(event) => setPreference("largeText", event.target.checked)} /> Larger text</label>
               <label><input type="checkbox" checked={profile.preferences.highContrast} onChange={(event) => setPreference("highContrast", event.target.checked)} /> Higher contrast</label>
               <label><input type="checkbox" checked={profile.preferences.reducedMotion} onChange={(event) => setPreference("reducedMotion", event.target.checked)} /> Reduce motion</label>
-              <p>These preferences apply to this page only.</p>
+              <p>Saved on this device with your confirmed profile.</p>
             </div>
           </details>
         </div>
@@ -294,7 +319,7 @@ export default function Home() {
             <span className="art-caption">A different way<br />to begin.</span>
           </div>
           <div className="welcome-footer"><div><span className="footer-icon">01</span><span>Start with what you’ve done</span></div><div><span className="footer-icon">02</span><span>Review every suggestion</span></div><div><span className="footer-icon">03</span><span>Keep the final say</span></div></div>
-          <aside className="privacy-note"><span aria-hidden="true">◌</span><p><strong>Your story stays yours.</strong> Your interview text is sent to Google Gemini to generate questions. Access keeps this session in browser memory; resetting or reloading clears it. Share only what you choose. Nothing is sent to an employer.</p></aside>
+          <aside className="privacy-note"><span aria-hidden="true">◌</span><p><strong>Your story stays yours.</strong> Your interview text is sent to Google Gemini to generate questions. Access saves confirmed profile details, their short source evidence, and your chosen preferences on this device. Full conversation history and unapproved suggestions stay in memory only. Reset &amp; delete removes saved details. Nothing is sent to an employer.</p></aside>
         </section>}
 
         {step === "story" && <section className="workspace" aria-labelledby="story-heading">
@@ -339,7 +364,7 @@ export default function Home() {
         {step === "application" && <section className="application" aria-labelledby="application-heading">
           <div className="application-heading"><div><p className="eyebrow"><span className="eyebrow-line" /> YOUR NEXT STEP</p><h1 id="application-heading">A draft you can make your own.</h1><p>Choose a fictional role. We’ll shape a starting point from the details you’ve confirmed.</p></div><span className="demo-tag"><span /> Fictional roles</span></div>
           <div className="job-layout"><section className="job-column" aria-labelledby="jobs-heading"><div className="section-title-row"><h2 id="jobs-heading">Choose a role</h2><span>3 sample listings</span></div><div className="job-list">{DEMO_JOBS.map((job, index) => <button key={job.id} className={`job-option${selectedJob === job.id ? " selected" : ""}`} aria-pressed={selectedJob === job.id} onClick={() => { setSelectedJob(job.id); setApplicationError(""); }}><span className={`job-symbol job-symbol-${index}`} aria-hidden="true">{["↗", "⌁", "＋"][index]}</span><span className="job-main"><strong>{job.title}</strong><span>{job.company} · {job.location}</span><small>{job.arrangement} <i>·</i> Fictional listing</small></span><span className="job-radio" aria-hidden="true">{selectedJob === job.id ? "✓" : ""}</span></button>)}</div><div className="job-description"><span className="small-label">ROLE SNAPSHOT</span><h3>{selected.title}</h3><p>{selected.description}</p><ul>{selected.requirements.map((requirement) => <li key={requirement}>{requirement}</li>)}</ul></div><button className="button button-primary generate-button" onClick={generateDraft} disabled={applicationPending}>{applicationPending ? "Preparing your draft…" : "Prepare application draft"} <span aria-hidden="true">↗</span></button><p className="no-submit"><span aria-hidden="true">◎</span> This only prepares a draft. It never applies or contacts an employer.</p>{applicationError && <div className="application-error" role="alert"><p>{applicationError}</p><button className="text-button" onClick={generateDraft} disabled={applicationPending}>Retry draft</button></div>}</section>
-            <section className="draft-column" aria-labelledby="draft-heading" aria-busy={applicationPending}><div className="draft-header"><div><span className="pane-index">C</span><div><h2 id="draft-heading">Your application draft</h2><p>{cv ? draftJobId === selectedJob ? "Ready for your review" : `Current draft: ${DEMO_JOBS.find((job) => job.id === draftJobId)?.title ?? "previous role"}` : "Your preview will appear here"}</p></div></div>{cv && <span className="draft-status"><i /> EDITABLE</span>}</div>{applicationPending && <p className="application-progress" role="status">Preparing your draft. Your existing text stays available while this runs.</p>}{cv ? <><div className="draft-editors"><div className="editor-block"><label htmlFor="cv-text">Curriculum vitae</label><textarea id="cv-text" value={cv} onChange={(event) => setCv(event.target.value)} rows={13} /></div><div className="editor-block"><label htmlFor="letter-text">Cover letter</label><textarea id="letter-text" value={letter} onChange={(event) => setLetter(event.target.value)} rows={12} /></div></div>{unverifiedClaims.length > 0 && <aside className="unverified-note" aria-labelledby="unverified-heading"><h3 id="unverified-heading">Details to check</h3><p>These details were uncertain, so Access left them out of your draft:</p><ul>{unverifiedClaims.map((claim, index) => <li key={`${index}-${claim}`}>{claim}</li>)}</ul></aside>}<div className="draft-actions"><p>Made from confirmed, work-related details. Read it through and change anything you like.</p><button className="button button-dark" onClick={downloadDraft}>Download .txt <span aria-hidden="true">↓</span></button></div></> : <div className="empty-draft"><div className="empty-mark" aria-hidden="true"><span>✳</span><i /><b /></div><h3>Your story will come through here.</h3><p>Prepare an application draft from the work-related details you have confirmed. You can edit every word before you download it.</p><span className="empty-rule" /></div>}</section></div>
+            <section className="draft-column" aria-labelledby="draft-heading" aria-busy={applicationPending}><div className="draft-header"><div><span className="pane-index">C</span><div><h2 id="draft-heading">Your application draft</h2><p>{cv ? draftJobId === selectedJob ? "Ready for your review" : `Current draft: ${DEMO_JOBS.find((job) => job.id === draftJobId)?.title ?? "previous role"}` : "Your preview will appear here"}</p></div></div>{cv && <span className="draft-status"><i /> EDITABLE</span>}</div>{applicationPending && <p className="application-progress" role="status">Preparing your draft. Your existing text stays available while this runs.</p>}{cv ? <><div className="draft-editors"><div className="editor-block"><label htmlFor="cv-text">Curriculum vitae</label><textarea id="cv-text" value={cv} onChange={(event) => setCv(event.target.value)} rows={13} /></div><div className="editor-block"><label htmlFor="letter-text">Cover letter</label><textarea id="letter-text" value={letter} onChange={(event) => setLetter(event.target.value)} rows={12} /></div></div>{unverifiedClaims.length > 0 && <aside className="unverified-note" aria-labelledby="unverified-heading"><h3 id="unverified-heading">Details to check</h3><p>These details were uncertain, so Access left them out of your draft:</p><ul>{unverifiedClaims.map((claim, index) => <li key={`${index}-${claim}`}>{claim}</li>)}</ul></aside>}<div className="draft-actions"><p>Made from confirmed, work-related details. Read it through and change anything you like.</p><div className="export-actions"><button className="button button-dark" onClick={() => downloadText(cv, `access-${draftJobId ?? selected.id}-cv.txt`, "Your CV")}>Download CV (.txt) <span aria-hidden="true">↓</span></button><button className="button button-dark" onClick={() => downloadText(letter, `access-${draftJobId ?? selected.id}-cover-letter.txt`, "Your cover letter")}>Download cover letter (.txt) <span aria-hidden="true">↓</span></button></div></div></> : <div className="empty-draft"><div className="empty-mark" aria-hidden="true"><span>✳</span><i /><b /></div><h3>Your story will come through here.</h3><p>Prepare an application draft from the work-related details you have confirmed. You can edit every word before you download it.</p><span className="empty-rule" /></div>}</section></div>
           <button className="back-link" onClick={() => setStep("story")}>← Back to your story</button>
         </section>}
       </div>
