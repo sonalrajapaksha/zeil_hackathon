@@ -6,7 +6,7 @@ Current milestone: M2 conversational AI; live Gemini flow verified. No ZEIL bonu
 | 01 | PASS (UI/build); visual screenshot QA unavailable | `fc779a3` | `npm run typecheck` PASS; `npm run build` PASS; local `curl` HTTP 200 | Browser-control tool unavailable in this session, so desktop/mobile screenshots and interactive browser QA remain outstanding |
 | 02 | PASS | `d0847e6` implementation; current follow-up fix in Git log | Typecheck, 8 mocked test groups, production build, desktop/mobile browser smoke, real Gemini start/follow-up/end PASS | — |
 | 03 | PASS | `4aaae34` | Typecheck, 9 unit groups, production build, browser smoke at 1280px/320px, genuine Gemini extraction/follow-up PASS | — |
-| 04 | PASS | Pending commit | `npm run typecheck`, `npm test` (14 groups), `npm run build`, browser smoke at 1280px/320px, genuine Gemini application draft PASS | Sensitive-data screening is deterministic phrase/contact matching plus model instructions; unusual euphemisms may need manual review |
+| 04 | PASS | `c5b2d18` | `npm run typecheck`, `npm test` (14 groups), `npm run build`, browser smoke at 1280px/320px, genuine Gemini application draft PASS | Sensitive-data screening is deterministic phrase/contact matching plus model instructions; unusual euphemisms may need manual review |
 | 05 | TODO | — | — | — |
 | 06 | TODO | — | — | — |
 | 07 | TODO | — | — | — |
