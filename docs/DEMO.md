@@ -14,6 +14,10 @@ Mere is a fictional jobseeker exploring customer-support work. Long, dense, mult
 
 This is a target journey, not permission to imply unfinished features work. Use only controls, Gemini responses, and accessibility behavior verified in the current build. If simple/standard wording, clarification, a preference control, or a tested access feature is still outstanding, identify it as follow-up work; do not stage a fake interaction.
 
+## B01 hiring proof segment (20–35 seconds)
+
+Use Mere as the required fictional disabled jobseeker persona. Describe the observable barrier as long, multi-step forms that are difficult for Mere to navigate; do not invent a diagnosis or imply this experience represents every disabled person. Show Mere choosing Simple questions and Larger text, describing volunteer experience once, reviewing and approving the evidence-backed suggestion, then choosing the clearly fictional Customer Support Assistant role and editing the resulting CV and letter. Point out that confirmed details carry forward into the editable drafts, avoiding repeated manual entry of those details across this application journey. Access is accessibility-first and available to everyone. Do not claim measured minutes saved or WCAG certification. Capture actual timestamps only after recording; none are recorded yet.
+
 ## Three-minute flow
 
 00:00–00:20: State the fictional form barrier and Mere's chosen preferences. Explain that Access is an accessibility-first career companion for everyone, not an assessment or hiring system. Avoid diagnosis and unmeasured time-saved claims.

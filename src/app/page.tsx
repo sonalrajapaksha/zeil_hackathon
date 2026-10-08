@@ -311,6 +311,7 @@ export default function Home() {
             <p className="eyebrow"><span className="eyebrow-line" /> YOUR NEXT CHAPTER, ON YOUR TERMS</p>
             <h1 id="welcome-heading">Your experience<br />is <span>more than</span><br />a résumé.</h1>
             <p className="welcome-intro">Accessibility-first career support for everyone. Tell your story by text, choose how we word questions, then shape an application that sounds like you.</p>
+            <p className="welcome-friction">Instead of repeating your work history across long application forms, describe it once, review each detail, and reuse only what you confirm in an editable draft.</p>
             <fieldset className="question-style welcome-style" aria-describedby="question-style-help"><legend>How should we ask questions?</legend>
               <div className="question-style-choice">
                 <label className={profile.preferences.questionStyle === "simple" ? "is-selected" : ""}><input id="question-style-simple" type="radio" name="question-style-welcome" value="simple" checked={profile.preferences.questionStyle === "simple"} onChange={() => setQuestionStyle("simple")} /><span><strong>Simple</strong><small>Short sentences, familiar words</small></span></label>
