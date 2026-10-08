@@ -10,7 +10,7 @@ Current milestone: M2 conversational AI; live Gemini flow verified. No ZEIL bonu
 | 05 | PASS | `251e75b` | `npm run typecheck`, `npm test` (18 cases), `npm run build`, mocked browser smoke at 1280px/320px | Full screen-reader and 200% zoom audit remains Task 06 |
 | 06 | PARTIAL (browser verification; manual screen-reader check outstanding) | `0630dc8` | `npm run typecheck`, `npm test` (18), `npm run build`, `npm run test:browser` at 320/640/1280, genuine simple/standard Gemini starts PASS | No VoiceOver/NVDA session available; 640 CSS px emulates the reflow width at 200% zoom but is not a browser zoom control test |
 | 07 | PASS | this handoff's commit | Typecheck, 18 unit tests, production build, and browser smoke at 320/640/1280; screenshots inspected at 320/1280 | Manual screen-reader and touch-device audit remain outstanding from Task 06 |
-| 08 | TODO | — | — | — |
+| 08 | PARTIAL (release rehearsal verified; screen-reader/manual public deploy gates pending) | pending Task 08 commit | `npm run typecheck`, `npm test` (18), `npm run build`, production browser smoke 320/640/1280, real Gemini route check, malformed and no-key HTTP checks PASS | No VoiceOver/NVDA spoken-output session or Vercel project access/authorization was available. See `docs/TASK08_RUNBOOK.md`; no public URL or B02 claim is recorded |
 | 09 | TODO | — | — | — |
 | 10 | TODO | — | — | — |
 | 11 | TODO | — | — | — |
@@ -116,3 +116,12 @@ Before Task 04, address the documented Task 01/02 preference and clarification f
 - Impeccable's detector reported only the Space Grotesk overused-font warning. Kept it because `docs/DESIGN.md` specifies it. No bonus claims were updated.
 - **Remaining:** visual browser smoke is not a live Gemini UI run, and manual screen-reader/touch-device testing remains unavailable as recorded under Task 06. Do not claim WCAG compliance.
 - **Next task:** Task 08, QA/deploy/demo, only when separately requested. Stop here.
+
+## Task 08 handoff
+
+- **Prepared:** `docs/DEMO.md` now has a rehearsal/reset checklist, honest preference and screen-reader language, and a visibly labeled prepared-content fallback. The fallback is a slide/spoken walkthrough only; the app has no offline sample mode and prepared text must not be passed off as Gemini output. `docs/TASK08_RUNBOOK.md` records exact Vercel setup, server-side environment variables, deploy steps, curl checks, and the judge journey.
+- **Verified on the production build:** `npm run typecheck` PASS; `npm test` PASS (18); `npm run build` PASS. `PLAYWRIGHT_MODULE=/Users/sonalrajapaksha/.npm/_npx/420ff84f11983ee5/node_modules/playwright/index.mjs ACCESS_TEST_URL=http://localhost:3010 npm run test:browser` PASS at 320px, 640px, and 1280px. It exercises keyboard navigation, Simple wording, larger text, high contrast, reduced motion, clarification, failure/retry, candidate edits and approval, application export, reset/delete, and no overflow/runtime errors. Gemini is mocked in this repeatable suite.
+- **Genuine provider evidence:** `npm run test:gemini` PASS for a real Simple-style start, clarification, contextual follow-up with evidence-grounded profile proposals, and end. A separate production-browser journey PASS: Gemini interview response → candidate approves “Helping visitors find books” → editable CV and letter generated for a fictional role. The first 45-second run timed out while waiting for the draft; the rerun completed successfully. No real candidate data was used.
+- **HTTP failure checks:** production endpoint rejects an extra request field with `400 INVALID_REQUEST`. A second production server started with an empty `GEMINI_API_KEY` returns `503 NOT_CONFIGURED` and a retryable setup message. Existing unit tests also cover malformed provider outputs, API refusal, timeout, and safe recovery.
+- **Not verified:** manual VoiceOver/NVDA spoken output remains unavailable; earlier 640px browser sizing models a narrow layout but is not an actual browser 200% zoom operation. No Vercel credentials, project access, explicit deploy authorization, or judge URL were provided, so this task documents deployment rather than publishing. B02 remains unclaimed; no WCAG conformance claim is made.
+- **Next task:** Task 09, hiring proof + deploy, only after the remaining release checks and a separate request. Stop here.

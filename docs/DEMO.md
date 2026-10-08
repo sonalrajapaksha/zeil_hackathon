@@ -1,5 +1,13 @@
 # Three-minute Access demo + scoring timestamps (fill after recording)
 
+## Rehearsal checklist
+
+1. Open the deployed HTTPS URL only after following `docs/TASK08_RUNBOOK.md` and passing its public smoke checks. A local demo can use `npm run dev` instead.
+2. Confirm the server has `GEMINI_API_KEY` and the chosen `GEMINI_MODEL`; never show or paste the key on screen. If the key or provider is unavailable, use the separate **SAMPLE FALLBACK** below and identify every prepared item as prepared content.
+3. Select **Simple** question wording and **Larger text** before starting. Keep the text entry, submit, and reset controls visible. Do not claim a screen-reader audit: keyboard and browser-semantic checks passed, but spoken output has not been checked with VoiceOver/NVDA.
+4. Use only fictional details. A candidate can use **Reset & delete** in the header to clear the local profile and start over. Do not enter real personal, disability, or medical information in a public demo.
+5. After the demo, reset and verify the welcome screen returns and the local saved profile is removed.
+
 ## Accessibility-first scenario
 
 Mere is a fictional jobseeker exploring customer-support work. Long, dense, multi-step application forms are difficult for Mere to navigate, so Mere chooses simple question wording, large text, and keyboard-operated text chat. This is one person's preference in the scenario, not a diagnosis, not a claim about all disabled people, and not a prerequisite to use Access. Access is designed with accessibility barriers in mind and is available to everyone.
@@ -18,7 +26,7 @@ This is a target journey, not permission to imply unfinished features work. Use 
 
 01:50–02:20: Select a clearly fictional, ZEIL-relevant role and prepare an editable draft from confirmed evidence. State that Access does not apply or contact the employer.
 
-02:20–02:45: Review and export the candidate-edited draft. Demonstrate keyboard access and any high-contrast/large-text/reduced-motion settings actually verified. Describe test conditions honestly; do not claim WCAG compliance without verification.
+02:20–02:45: Review and export the candidate-edited draft. Demonstrate keyboard access and the large-text preference. High contrast and reduced motion have automated computed-style/browser checks. Describe test conditions honestly; do not claim WCAG compliance without verification.
 
 02:45–03:00: Close with candidate control and what remains private. Mention only bonus evidence that exists and is verified. Use actual deployed URL only after a judge-accessible deployment works.
 
@@ -33,4 +41,23 @@ Separate bonus evidence video/timestamps if the main pitch is too short. Fill ac
 - **B05 Eyes and Ears:** show native Gemini processing of a bounded sample PDF/image and candidate review; pasted extracted text is not proof.
 - **Task 13 Live:** show actual realtime microphone-to-Gemini audio and spoken response, with permission and working text fallback. Async interview chat does not qualify.
 
-Provide “SAMPLE FALLBACK” label when using prepared content. Keep genuine model output separately identifiable. Never fabricate a candidate, response, test result, deployment, recording, or scoring claim.
+## SAMPLE FALLBACK (prepared, not model output)
+
+Use this only as a clearly titled slide or spoken walkthrough if Gemini is unavailable. Do not paste it into the live chat or draft editor and imply the app generated it. The app has no offline AI/sample mode; the live interface will show a recoverable configuration/provider error instead.
+
+**SAMPLE FALLBACK — PREPARED CONTENT, NOT GEMINI OUTPUT**
+
+- Fictional scenario: Mere chooses Simple wording and Larger text. This preference belongs to this scenario and is not a diagnosis or a requirement for using Access.
+- Prepared candidate statement: “I volunteer at a community library on Saturdays. I help visitors find books and keep the children’s area organised.”
+- Prepared profile proposal: “Helping visitors find books”, supported by the quoted candidate statement. In a live session, the candidate must review and approve a proposal before it can enter the application draft.
+- Prepared application example: an editable CV and cover letter for the fictional Customer Support Assistant role, using only a candidate-approved, work-related detail.
+
+These lines are a fallback illustration only. They are not proof of a live response, a completed application, saved candidate data, measured time savings, or an accessible screen-reader journey. Keep genuine model output and prepared content visually distinct.
+
+## Current rehearsal evidence
+
+- Production build and browser smoke passed at 320px, 640px, and 1280px. The browser smoke uses mocked Gemini responses; it verifies keyboard interaction, settings, errors, confirmation, exports, reset, and no horizontal overflow.
+- A separate production-browser run completed a genuine Gemini interview, candidate approval, and editable fictional-role CV/letter generation. API credentials and personal candidate information were not used in the browser scenario.
+- Manual VoiceOver/NVDA output and a public judge-accessible URL remain unverified. Do not claim B02 Ship It or WCAG conformance until their respective proof exists.
+
+Never fabricate a candidate, response, test result, deployment, recording, or scoring claim.
