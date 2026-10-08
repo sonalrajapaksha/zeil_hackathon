@@ -19,6 +19,13 @@ globalThis.fetch = async (_url, init) => {
   if (release) await new Promise((resolve) => { release = resolve; });
   if (failNext) { failNext = false; throw new Error('mock provider failure'); }
   const body = JSON.parse(init.body);
+  if (body.generationConfig.responseJsonSchema?.properties?.findings) {
+    const items = JSON.parse(body.contents[0].parts[0].text);
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ findings: items.map((item) => ({ index: item.index, sensitive: false })) }) }] }, finishReason: 'STOP' }] }));
+  }
+  if (body.generationConfig.responseJsonSchema?.properties?.sensitive) {
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ sensitive: false }) }] }, finishReason: 'STOP' }] }));
+  }
   if (body.generationConfig.responseJsonSchema?.properties?.cvText) {
     const input = JSON.parse(body.contents[0].parts[0].text);
     const details = input.evidence.map((item) => item.text);
@@ -81,7 +88,7 @@ try {
     assert.equal(await page.getByRole('button', { name: 'Clarify question' }).isDisabled(), true);
     failNext = true;
     await page.getByRole('button', { name: 'Send answer' }).click();
-    await page.getByRole('alert').waitFor();
+    await page.locator('#interview-error').waitFor();
     assert.equal(await page.getByLabel('Add to your story').inputValue(), 'I volunteer at a library.');
     assert.equal(await page.locator('.chat-line').count(), 3);
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
@@ -133,7 +140,7 @@ try {
     await page.getByLabel('Curriculum vitae').fill('My reviewed CV edit.');
     failNext = true;
     await page.getByRole('button', { name: 'Prepare application draft' }).click();
-    await page.getByRole('alert').waitFor();
+    await page.locator('.application-error').waitFor();
     assert.equal(await page.getByLabel('Curriculum vitae').inputValue(), 'My reviewed CV edit.', 'A failed generation preserves candidate edits');
     await page.getByRole('button', { name: 'Retry draft' }).click();
     await page.getByLabel('Curriculum vitae').evaluate((element) => new Promise((resolve) => {
