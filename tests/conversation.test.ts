@@ -17,7 +17,7 @@ function request(body: unknown) {
   return new Request('http://localhost/api/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 }
 function sentThinking(init: RequestInit | undefined) {
-  return JSON.parse(String(init?.body)).generationConfig.thinkingConfig?.thinkingBudget;
+  return JSON.parse(String(init?.body)).generationConfig.thinkingConfig;
 }
 function fakeGemini(reply = 'What did you enjoy about helping library visitors?', suggestions: { kind: 'skill' | 'experience' | 'education'; text: string; evidence: string }[] = []) {
   process.env.GEMINI_API_KEY = 'test-secret';
@@ -36,8 +36,8 @@ test('start returns typed initial question and bounded SDK configuration', async
   assert.equal(result.interview.questions, 1);
   assert.deepEqual(result.suggestions, []);
   const [url, init] = sdk.mock.calls[0].arguments;
-  assert.match(String(url), /gemini-3.8-flash/);
-  assert.equal(sentThinking(init), undefined);
+  assert.match(String(url), /gemini-3.6-flash/);
+  assert.deepEqual(sentThinking(init), { thinkingLevel: 'LOW' });
   const sent = JSON.parse(String(init!.body));
   assert.equal(sent.generationConfig.responseMimeType, 'application/json');
   assert.equal(sent.generationConfig.maxOutputTokens, 1024);
@@ -170,6 +170,11 @@ test('provider errors, refusal and timeout preserve request; exact retry works',
     assert.equal(JSON.stringify(body), original);
     sdk.mock.restore();
   }
+  const expired = mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ error: { code: 504, message: 'Deadline expired before operation could complete.' } }), { status: 504 }));
+  const timedOut = await POST(request(body));
+  assert.equal(timedOut.status, 504);
+  assert.equal((await timedOut.json()).error.code, 'TIMEOUT');
+  expired.mock.restore();
   const sdk = mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ error: { code: 429, message: 'quota', status: 'RESOURCE_EXHAUSTED' } }), { status: 429 }));
   assert.equal((await POST(request(body))).status, 429);
   assert.equal(sdk.mock.calls.length, 1, 'No hidden SDK retries');

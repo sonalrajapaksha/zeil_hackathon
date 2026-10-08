@@ -7,10 +7,10 @@ Set server-only values in the ignored `.env.local`:
 
 ```dotenv
 GEMINI_API_KEY=your-own-key
-GEMINI_MODEL=gemini-3.8-flash
+GEMINI_MODEL=gemini-3.6-flash
 ```
 
-The model is configurable; choose one enabled for your Gemini account. The default is `gemini-3.8-flash`. Restart Next.js after changing environment values. Never use a `NEXT_PUBLIC_` key variable.
+The model is configurable; choose one enabled for your Gemini account. The default is `gemini-3.6-flash`. Restart Next.js after changing environment values. Never use a `NEXT_PUBLIC_` key variable.
 Run `npm run dev`, then start an interview. The UI discloses transmission to Google Gemini. Access stores the session only in browser memory; reload/reset clears it. No candidate history or provider errors are logged by the route. Google provider retention is governed by your account terms.
 
 ## API and state

@@ -114,4 +114,9 @@ test('missing key and provider errors return safe recovery messages', async () =
   assert.equal(body.error.code, 'PROVIDER_ERROR');
   assert.ok(!JSON.stringify(body).includes('private upstream details'));
   sdk.mock.restore();
+  const deadline = mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ error: { code: 504, message: 'Deadline expired before operation could complete.' } }), { status: 504 }));
+  const timedOut = await POST(request({ profile, jobId: 'harbour-support' }));
+  assert.equal(timedOut.status, 504);
+  assert.equal((await timedOut.json()).error.code, 'TIMEOUT');
+  deadline.mock.restore();
 });

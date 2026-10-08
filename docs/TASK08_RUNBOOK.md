@@ -6,7 +6,7 @@ Deployment was not performed for Task 08 because no Vercel account/project acces
 
 1. Push the reviewed commit to the authorized GitHub repository. In Vercel, choose **Add New → Project**, import that repository, and select the project root.
 2. Keep the detected **Next.js** framework settings: install `npm install`, build `npm run build`, and output settings default. Set the Node.js version to **20.x** or later in Project Settings → General.
-3. In Project Settings → Environment Variables, add `GEMINI_API_KEY` with the Gemini API key for **Production** and **Preview** only if previews are intended for judges. Add `GEMINI_MODEL=gemini-3.8-flash` (or a model enabled for that API account). Keep both server-side. Never use a `NEXT_PUBLIC_` prefix, commit `.env.local`, or place the key in a client setting.
+3. In Project Settings → Environment Variables, add `GEMINI_API_KEY` with the Gemini API key for **Production** and **Preview** only if previews are intended for judges. Add `GEMINI_MODEL=gemini-3.6-flash` (or a model enabled for that API account). Keep both server-side. Never use a `NEXT_PUBLIC_` prefix, commit `.env.local`, or place the key in a client setting.
 4. Deploy to Production. In Vercel's deployment page, wait for Ready, open the generated HTTPS domain, and record that exact URL in the README only after the checks below pass. Do not claim B02 from a successful build alone.
 5. In Vercel → Settings → Environment Variables, rotate or replace an exposed key, then redeploy after any environment change. Do not put candidate stories or other personal data into deployment logs or issue reports.
 

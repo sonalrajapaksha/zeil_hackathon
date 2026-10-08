@@ -1,4 +1,4 @@
-import { GoogleGenAI, ApiError } from '@google/genai';
+import { GoogleGenAI, ApiError, ThinkingLevel } from '@google/genai';
 import { z } from 'zod';
 import { CLARIFICATION_REQUEST, ConversationRequestSchema, ConversationResponseSchema, INTERVIEW_LIMIT, type ConversationErrorSchema } from '../../../lib/contracts.ts';
 import { END_REPLY, prepareTurn, progress } from '../../../lib/interview.ts';
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
+    const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.6-flash';
     const response = await ai.models.generateContent({
       model,
       contents: history.length ? history.map((message) => ({
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
         temperature: 0.5,
         maxOutputTokens: 1024,
         // Reserve the small output budget for the question on the default Flash model.
-        ...(model.startsWith('gemini-2.5-flash') ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+        ...(model.startsWith('gemini-3.') ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : model.startsWith('gemini-2.5-flash') ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
         responseMimeType: 'application/json',
         responseJsonSchema: { type: 'object', properties: { reply: { type: 'string' }, suggestions: { type: 'array', maxItems: 5, items: { type: 'object', properties: { kind: { type: 'string', enum: ['skill', 'experience', 'education'] }, text: { type: 'string' }, evidence: { type: 'string' } }, required: ['kind', 'text', 'evidence'], additionalProperties: false } } }, required: ['reply', 'suggestions'], additionalProperties: false },
         httpOptions: { timeout: 30_000, retryOptions: { attempts: 1 } },
@@ -99,6 +99,8 @@ export async function POST(request: Request) {
       return failure('TIMEOUT', 'The AI took too long. Your story is unchanged. Please retry.', 504, true);
     if (error instanceof ApiError && error.status === 429)
       return failure('RATE_LIMITED', 'The AI is busy or its quota has been reached. Please wait before retrying, or ask the demo host to check the quota.', 429, true);
+    if (error instanceof ApiError && [408, 504].includes(error.status ?? 0))
+      return failure('TIMEOUT', 'Gemini took too long to respond. Your story is unchanged. Please retry.', 504, true);
     if (error instanceof ApiError && [400, 401, 403, 404].includes(error.status ?? 0))
       return failure('PROVIDER_ERROR', 'Gemini rejected this request. Ask the demo host to check the server API key and ensure GEMINI_MODEL is available and supports JSON responses.', 502);
     return failure('PROVIDER_ERROR', 'The AI is unavailable. Your story is unchanged. Please retry; if this continues, ask the demo host to check the server model and API key.', 502, true);
