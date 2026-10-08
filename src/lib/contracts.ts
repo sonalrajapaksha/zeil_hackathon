@@ -1,0 +1,10 @@
+import { z } from "zod";
+export const ExperienceSchema = z.object({ id:z.string(), organisation:z.string(), role:z.string(), dateRange:z.string().optional(), evidence:z.array(z.string()), confirmed:z.boolean().default(false) });
+export const CandidateProfileSchema = z.object({ name:z.string().optional(), summary:z.string().optional(), skills:z.array(z.object({name:z.string(), evidence:z.string(), confirmed:z.boolean().default(false)})), experience:z.array(ExperienceSchema), education:z.array(z.string()), preferences:z.object({largeText:z.boolean(), highContrast:z.boolean(), reducedMotion:z.boolean()}) });
+export const JobListingSchema = z.object({id:z.string(),title:z.string(),company:z.string(),location:z.string(),arrangement:z.string(),description:z.string(),requirements:z.array(z.string())});
+export const ConversationMessageSchema = z.object({id:z.string(),role:z.enum(['user','assistant']),content:z.string()});
+export const ApplicationPackageSchema = z.object({jobId:z.string(),cvText:z.string(),coverLetter:z.string(),unverifiedClaims:z.array(z.string()),generatedAt:z.string()});
+export type CandidateProfile = z.infer<typeof CandidateProfileSchema>;
+export type JobListing = z.infer<typeof JobListingSchema>;
+export type ConversationMessage = z.infer<typeof ConversationMessageSchema>;
+export type ApplicationPackage = z.infer<typeof ApplicationPackageSchema>;
