@@ -337,7 +337,7 @@ export default function Home() {
           <div className="mobile-switch" role="group" aria-label="Workspace panel"><button aria-pressed={mobilePanel === "conversation"} onClick={() => setMobilePanel("conversation")}>Conversation</button><button aria-pressed={mobilePanel === "canvas"} onClick={() => setMobilePanel("canvas")}>Career canvas <span className="count-pill">{claims.length}</span></button></div>
           <div className="workspace-grid">
             <section className={`conversation-pane${mobilePanel === "canvas" ? " mobile-hidden" : ""}`} aria-labelledby="conversation-heading">
-              <div className="pane-heading"><div><span className="pane-index">A</span><h2 id="conversation-heading">In your words</h2></div><span className="small-label">AI CONVERSATION</span></div>
+              <div className="pane-heading"><div><h2 id="conversation-heading">In your words</h2></div></div>
               <div ref={chatLog} className="chat-log" role="region" tabIndex={0} aria-label="Conversation history" aria-busy={pending}>
                 {chat.map((line) => <div key={line.id} className={`chat-line ${line.role === "user" ? "you" : "access"}`}><div className="avatar" aria-hidden="true">{line.role === "user" ? (profile.name?.[0] || "Y") : <Mark small />}</div><div><span className="speaker">{line.role === "user" ? "You" : "Access · Gemini"}</span><p>{line.content === CLARIFICATION_REQUEST ? "Could you clarify this question?" : line.content}</p>{line.role === "user" && !["[Question skipped by candidate]", CLARIFICATION_REQUEST].includes(line.content) && <button className="text-button" disabled={pending || interview.status === "ended"} onClick={() => { setCorrectionId(line.id); setMessage(line.content); setError(""); setFailedRequest(null); messageInput.current?.focus(); }}>Correct this answer</button>}</div></div>)}
               </div>
@@ -352,15 +352,15 @@ export default function Home() {
             </section>
 
             <section className={`canvas-pane${mobilePanel === "conversation" ? " mobile-hidden" : ""}`} aria-labelledby="canvas-heading">
-              <div className="pane-heading canvas-title"><div><span className="pane-index">B</span><div><h2 id="canvas-heading">Career canvas</h2><p>A living draft of what you bring.</p></div></div><span className="canvas-glyph" aria-hidden="true">✳</span></div>
+              <div className="pane-heading canvas-title"><div><div><h2 id="canvas-heading">Career canvas</h2><p>A living draft of what you bring.</p></div></div></div>
               <div className="candidate-line"><span className="candidate-avatar" aria-hidden="true">{profile.name?.slice(0, 1).toUpperCase()}</span><span><label className="sr-only" htmlFor="candidate-name">Candidate name</label><input className="candidate-name" id="candidate-name" placeholder="Your name" value={profile.name ?? ""} onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))} /><small>Your name · optional</small></span><span className="edit-name">Editable</span></div>
-              <div className="section-label"><span>PROFILE SUGGESTIONS</span><span>{confirmed.length} confirmed · {claims.length - confirmed.length} to review</span></div>
+              <div className="section-label"><span>Profile suggestions</span><span>{confirmed.length} confirmed · {claims.length - confirmed.length} to review</span></div>
               <ul className="note-list">
                 {!claims.length && <li>Add something yourself or continue your interview to see grounded suggestions here.</li>}
                 {claims.map((claim) => <li key={`${claim.kind}-${claim.id}`} className={`note-item ${claim.confirmed ? "confirmed" : "pending"}`}>
                   <span className="note-status" aria-label={claim.confirmed ? "Confirmed" : "Needs your review"}>{claim.confirmed ? "✓" : "· · ·"}</span>
                   <div className="claim-content"><span className="claim-kind">{claim.kind}</span><label className="sr-only" htmlFor={`note-${claim.id}`}>{claim.confirmed ? "Confirmed" : "Suggested"} {claim.kind}</label><input id={`note-${claim.id}`} value={claim.text} onChange={(event) => updateClaim(claim.kind, claim.id, event.target.value)} /><p className="claim-evidence"><strong>From your answer:</strong> “{claim.evidence}”</p></div>
-                  {!claim.confirmed ? <div className="note-actions"><button className="icon-action accept" onClick={() => confirmClaim(claim.kind, claim.id)}>Approve</button><button className="icon-action" onClick={() => removeClaim(claim.kind, claim.id)}>Remove</button></div> : <span className="confirmed-label">YOURS</span>}
+                  {!claim.confirmed ? <div className="note-actions"><button className="icon-action accept" onClick={() => confirmClaim(claim.kind, claim.id)}>Approve</button><button className="icon-action" onClick={() => removeClaim(claim.kind, claim.id)}>Remove</button></div> : <span className="confirmed-label">Confirmed</span>}
                 </li>)}
               </ul>
               <form className="add-skill" onSubmit={addSkill}><label htmlFor="skill">Add something yourself</label><div><input id="skill" value={skillDraft} onChange={(event) => setSkillDraft(event.target.value)} placeholder="A skill or experience" /><button className="add-button" disabled={!skillDraft.trim()} aria-label="Add confirmed experience">+</button></div></form>

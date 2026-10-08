@@ -29,6 +29,32 @@
 .export-actions{display:flex;flex-wrap:wrap;gap:10px}
 @media(max-width:650px){.export-actions{width:100%;flex-direction:column}.export-actions .button{width:100%}}
 
+/* Conversation and canvas readability refinements. */
+.chat-log{gap:22px;padding-top:22px}
+.chat-line{gap:12px}
+.speaker{font-size:12px}
+.chat-line p{font-size:16px;line-height:1.55;max-width:64ch}
+.interview-status{display:flex;align-items:center;color:var(--muted);font-size:14px}
+.message-form>label{font-size:15px}
+.form-bottom>span{font-size:13px}
+.form-bottom .button{min-height:44px}
+.prompt-row .text-button{min-height:44px;padding:7px 4px}
+.section-label{font-size:12px;letter-spacing:.02em;text-transform:none}
+.note-item{padding-top:14px;padding-bottom:14px}
+.note-item input{font-size:15px}
+.claim-kind{font-size:11px;letter-spacing:.04em}
+.claim-evidence{font-size:13px}
+.confirmed-label{font-size:12px;letter-spacing:0;text-transform:none}
+::selection{background:var(--purple-wash);color:var(--ink)}
+input,textarea{caret-color:var(--purple-dark)}
+@media(max-width:650px){
+  .conversation-pane,.canvas-pane{padding-left:16px;padding-right:16px}
+  .form-bottom{align-items:stretch;flex-direction:column}
+  .form-bottom>span{max-width:none}
+  .form-bottom .button{width:100%;justify-content:space-between}
+}
+@media(max-width:360px){.conversation-pane,.canvas-pane{padding-left:12px;padding-right:12px}}
+
 /* Keep decorative artwork inside the narrow welcome layout. */
 .welcome-art{overflow:hidden}
 

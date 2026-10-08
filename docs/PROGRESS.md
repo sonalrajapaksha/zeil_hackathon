@@ -9,7 +9,7 @@ Current milestone: M2 conversational AI; live Gemini flow verified. No ZEIL bonu
 | 04 | PASS | `8372517` (sensitive-screen follow-up) | `npm run typecheck`, `npm test` (16 test cases), `npm run build`, browser smoke at 1280px/320px, genuine Gemini application draft with input/output semantic screens PASS | Automated semantic screening can still make false negatives; candidate review remains required |
 | 05 | PASS | `251e75b` | `npm run typecheck`, `npm test` (18 cases), `npm run build`, mocked browser smoke at 1280px/320px | Full screen-reader and 200% zoom audit remains Task 06 |
 | 06 | PARTIAL (browser verification; manual screen-reader check outstanding) | `0630dc8` | `npm run typecheck`, `npm test` (18), `npm run build`, `npm run test:browser` at 320/640/1280, genuine simple/standard Gemini starts PASS | No VoiceOver/NVDA session available; 640 CSS px emulates the reflow width at 200% zoom but is not a browser zoom control test |
-| 07 | TODO | — | — | — |
+| 07 | PASS | this handoff's commit | Typecheck, 18 unit tests, production build, and browser smoke at 320/640/1280; screenshots inspected at 320/1280 | Manual screen-reader and touch-device audit remain outstanding from Task 06 |
 | 08 | TODO | — | — | — |
 | 09 | TODO | — | — | — |
 | 10 | TODO | — | — | — |
@@ -106,3 +106,13 @@ Before Task 04, address the documented Task 01/02 preference and clarification f
 - **Screen-reader gap:** no VoiceOver/NVDA session or browser-control surface was available. Semantic roles/names, concise live announcements, and error associations were checked through browser automation, but spoken output and a full manual Tab/Shift+Tab audit remain unverified. Do not claim WCAG certification.
 - The Impeccable detector reports only Space Grotesk as an overused font; it remains because `docs/DESIGN.md` specifies it. No bonus claim was updated.
 - **Next task:** Task 07, visual craft and Impeccable, only after a separate request. Stop here.
+
+## Task 07 handoff
+
+- Refined the conversation and Living Career Canvas while preserving the existing warm ivory, violet, ink, and lime identity. Removed redundant panel markers and the duplicate AI label, clarified the profile section label and confirmed state, and improved spacing and legibility for conversation text, evidence, and profile claims.
+- On mobile, the answer guidance and submit action now stack into a full-width 44px touch target instead of competing in a narrow row. Added palette-based text selection and caret colors. Existing reduced-motion behavior remains in place.
+- **Changed files:** `src/app/page.tsx`, `src/app/styles.css`, `docs/PROGRESS.md`. Pre-existing user edits in `README.md` were left untouched and excluded from this task commit.
+- **Verification:** baseline and final `npm run typecheck` PASS; `npm test` PASS (18 tests); `npm run build` PASS; `PLAYWRIGHT_MODULE=/Users/sonalrajapaksha/.npm/_npx/420ff84f11983ee5/node_modules/playwright/index.mjs ACCESS_TEST_URL=http://localhost:3002 npm run test:browser` PASS at 320px, 640px, and 1280px. The browser flow verified keyboard operation, screen announcements, responsive layout, core profile approval and draft/export flow, and no horizontal overflow or runtime errors. Screenshots `/tmp/access-task02-320.png` and `/tmp/access-task02-1280.png` were inspected; their conversation responses came from the browser test's mocked Gemini transport.
+- Impeccable's detector reported only the Space Grotesk overused-font warning. Kept it because `docs/DESIGN.md` specifies it. No bonus claims were updated.
+- **Remaining:** visual browser smoke is not a live Gemini UI run, and manual screen-reader/touch-device testing remains unavailable as recorded under Task 06. Do not claim WCAG compliance.
+- **Next task:** Task 08, QA/deploy/demo, only when separately requested. Stop here.
