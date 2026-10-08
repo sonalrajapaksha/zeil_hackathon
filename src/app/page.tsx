@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { DEMO_JOBS } from "@/lib/jobs";
-import { ApplicationErrorSchema, ApplicationPackageSchema, CLARIFICATION_REQUEST, ConversationErrorSchema, ConversationResponseSchema, type ApplicationPackage, type CandidateProfile, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
+import { ApplicationErrorSchema, ApplicationPackageSchema, CLARIFICATION_REQUEST, ConversationErrorSchema, ConversationResponseSchema, CvImportErrorSchema, CvImportResponseSchema, type ApplicationPackage, type CandidateProfile, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
 import { EMPTY_INTERVIEW, progress } from "@/lib/interview";
 import { deleteSavedProfile, loadSavedProfile, saveProfile } from "@/lib/persistence";
 
@@ -28,6 +28,7 @@ export default function Home() {
   const [failedRequest, setFailedRequest] = useState<ConversationRequest | null>(null);
   const [correctionId, setCorrectionId] = useState<string | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
+  const activeCvImport = useRef<AbortController | null>(null);
   const skipNextPersist = useRef(false);
   const storageFailureReported = useRef(false);
   const messageInput = useRef<HTMLTextAreaElement>(null);
@@ -59,6 +60,8 @@ export default function Home() {
   ], [profile]);
   const confirmed = useMemo(() => claims.filter((claim) => claim.confirmed), [claims]);
   const [skillDraft, setSkillDraft] = useState("");
+  const [cvImportPending, setCvImportPending] = useState(false);
+  const [cvImportError, setCvImportError] = useState("");
   const [selectedJob, setSelectedJob] = useState(DEMO_JOBS[0].id);
   const [cv, setCv] = useState("");
   const [letter, setLetter] = useState("");
@@ -251,6 +254,53 @@ export default function Home() {
     }
   }
 
+  async function importCv(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const file = form.querySelector<HTMLInputElement>("#cv-file");
+    if (!file?.files?.[0]) return;
+    const selectedFile = file.files[0];
+    if (selectedFile.type !== "application/pdf" || selectedFile.size > 5 * 1024 * 1024) {
+      setCvImportError("Choose a PDF no larger than 5 MB. You can also enter your experience by text.");
+      return;
+    }
+    setCvImportPending(true); setCvImportError("");
+    const controller = new AbortController(); activeCvImport.current = controller;
+    setAnnouncement("Sending your PDF to Gemini for native reading. It is not saved by Access.");
+    try {
+      const data = new FormData(); data.set("file", selectedFile);
+      const response = await fetch("/api/cv-import", { method: "POST", body: data, signal: controller.signal });
+      const body: unknown = await response.json();
+      if (activeCvImport.current !== controller) return;
+      if (!response.ok) {
+        const failure = CvImportErrorSchema.safeParse(body);
+        throw new Error(failure.success ? failure.data.error.message : "The PDF could not be read. Your profile is unchanged.");
+      }
+      const parsed = CvImportResponseSchema.safeParse(body);
+      if (!parsed.success) throw new Error("Gemini returned an unusable result. Your profile is unchanged.");
+      const suggestions = parsed.data.suggestions;
+      setProfile((current) => {
+        const next = { ...current, skills: [...current.skills], experience: [...current.experience], education: [...current.education] };
+        for (const suggestion of suggestions) {
+          const text = suggestion.text.trim();
+          const existing = [...next.skills.map((item) => ({ kind: "skill", text: item.name })), ...next.experience.map((item) => ({ kind: "experience", text: "text" in item ? item.text : item.role })), ...next.education.map((item) => ({ kind: "education", text: item.text }))];
+          if (existing.some((item) => item.kind === suggestion.kind && item.text.toLocaleLowerCase() === text.toLocaleLowerCase())) continue;
+          const id = crypto.randomUUID();
+          if (suggestion.kind === "skill") next.skills.push({ id, name: text, evidence: suggestion.evidence, confirmed: false });
+          else if (suggestion.kind === "experience") next.experience.push({ id, text, evidence: [suggestion.evidence], confirmed: false });
+          else next.education.push({ id, text, evidence: suggestion.evidence, confirmed: false });
+        }
+        return next;
+      });
+      setAnnouncement(suggestions.length ? `${suggestions.length} CV suggestion${suggestions.length === 1 ? " is" : "s are"} ready for your review. Nothing was confirmed.` : "The PDF was read, but no work-related suggestions were found.");
+      form.reset();
+    } catch (failure) {
+      if (activeCvImport.current !== controller) return;
+      const message = failure instanceof Error ? failure.message : "The PDF could not be read. Your profile is unchanged.";
+      setCvImportError(message); setAnnouncement(message);
+    } finally { if (activeCvImport.current === controller) { activeCvImport.current = null; setCvImportPending(false); } }
+  }
+
   function downloadText(text: string, filename: string, label: string) {
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -269,6 +319,7 @@ export default function Home() {
     deleteSavedProfile();
     skipNextPersist.current = true;
     activeRequest.current?.abort(); activeRequest.current = null;
+    activeCvImport.current?.abort(); activeCvImport.current = null; setCvImportPending(false); setCvImportError("");
     setPending(false); setError(""); setFailedRequest(null); setCorrectionId(null); setInterview(EMPTY_INTERVIEW);
     setStep("welcome"); setChat([]); setProfile(emptyProfile()); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setMobilePanel("conversation"); setCv(""); setLetter(""); setDraftJobId(null); setUnverifiedClaims([]); setApplicationError(""); setAnnouncement("Your session has been reset.");
   }
@@ -355,6 +406,13 @@ export default function Home() {
             <section className={`canvas-pane${mobilePanel === "conversation" ? " mobile-hidden" : ""}`} aria-labelledby="canvas-heading">
               <div className="pane-heading canvas-title"><div><div><h2 id="canvas-heading">Career canvas</h2><p>A living draft of what you bring.</p></div></div></div>
               <div className="candidate-line"><span className="candidate-avatar" aria-hidden="true">{profile.name?.slice(0, 1).toUpperCase()}</span><span><label className="sr-only" htmlFor="candidate-name">Candidate name</label><input className="candidate-name" id="candidate-name" placeholder="Your name" value={profile.name ?? ""} onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))} /><small>Your name · optional</small></span><span className="edit-name">Editable</span></div>
+              <form className="cv-import" onSubmit={importCv} aria-busy={cvImportPending}>
+                <label htmlFor="cv-file">Optional: read a sample CV PDF</label>
+                <p>Gemini reads the PDF itself. Access does not save the file. Review every suggestion before approving it. This is an optional input method; you can continue by text.</p>
+                <div><input id="cv-file" name="cv-file" type="file" accept="application/pdf,.pdf" aria-describedby={cvImportError ? "cv-import-error" : "cv-import-help"} disabled={cvImportPending} /><button className="button button-dark" type="submit" disabled={cvImportPending}>{cvImportPending ? "Reading PDF…" : "Read PDF"}</button></div>
+                <small id="cv-import-help">PDF only · 5 MB maximum · sent to Google Gemini for processing</small>
+                {cvImportError && <p id="cv-import-error" className="cv-import-error" role="alert">{cvImportError}</p>}
+              </form>
               <div className="section-label"><span>Profile suggestions</span><span>{confirmed.length} confirmed · {claims.length - confirmed.length} to review</span></div>
               <ul className="note-list">
                 {!claims.length && <li>Add something yourself or continue your interview to see grounded suggestions here.</li>}

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { POST } from '../src/app/api/conversation/route.ts';
 import { POST as applicationPOST } from '../src/app/api/application/route.ts';
+import { POST as cvImportPOST } from '../src/app/api/cv-import/route.ts';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const browser = await chromium.launch({
   headless: true,
@@ -26,8 +27,11 @@ globalThis.fetch = async (_url, init) => {
   if (systemInstruction) questionStyles.push(JSON.stringify(systemInstruction));
   if (body.generationConfig.responseJsonSchema?.properties?.findings) {
     const items = JSON.parse(body.contents[0].parts[0].text);
-    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ findings: items.map((item) => ({ index: item.index, sensitive: false })) }) }] }, finishReason: 'STOP' }] }));
+    const nativeCv = body.contents[0].parts.some((part) => part.inlineData?.mimeType === 'application/pdf');
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ findings: items.map((item) => nativeCv ? ({ index: item.index, sensitive: false, supported: true }) : ({ index: item.index, sensitive: false })) }) }] }, finishReason: 'STOP' }] }));
   }
+  if (body.contents[0].parts?.[1]?.inlineData?.mimeType === 'application/pdf')
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ suggestions: [{ kind: 'experience', text: 'PDF visitor support', evidence: 'I helped visitors at the library.' }] }) }] }, finishReason: 'STOP' }] }));
   if (body.generationConfig.responseJsonSchema?.properties?.sensitive) {
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ sensitive: false }) }] }, finishReason: 'STOP' }] }));
   }
@@ -83,6 +87,13 @@ try {
     await page.route('**/api/application', async (route) => {
       const response = await applicationPOST(new Request('http://localhost/api/application', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: route.request().postData(),
+      }));
+      await route.fulfill({ status: response.status, contentType: 'application/json', body: await response.text() });
+    });
+    await page.route('**/api/cv-import', async (route) => {
+      const headers = route.request().headers();
+      const response = await cvImportPOST(new Request('http://localhost/api/cv-import', {
+        method: 'POST', headers: { 'Content-Type': headers['content-type'] }, body: route.request().postDataBuffer(),
       }));
       await route.fulfill({ status: response.status, contentType: 'application/json', body: await response.text() });
     });
@@ -169,6 +180,14 @@ try {
     if (width <= 650) { await page.getByRole('button', { name: /Career canvas/ }).focus(); await page.keyboard.press('Enter'); }
     await page.getByLabel('Add something yourself').fill('Event planning');
     await page.getByRole('button', { name: 'Add confirmed experience' }).focus(); await page.keyboard.press('Enter');
+    await page.locator('#cv-file').setInputFiles({ name: 'sample.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nSynthetic test CV') });
+    await page.getByRole('button', { name: 'Read PDF' }).focus(); await page.keyboard.press('Enter');
+    await page.locator('[aria-live="polite"]').filter({ hasText: 'CV suggestion is ready for your review.' }).waitFor();
+    const pdfSuggestion = page.locator('.note-item').last();
+    await pdfSuggestion.getByLabel('Suggested experience').waitFor();
+    assert.equal(await pdfSuggestion.getByLabel('Suggested experience').inputValue(), 'PDF visitor support');
+    assert.equal(await pdfSuggestion.getByRole('button', { name: 'Approve' }).count(), 1, 'PDF claims remain pending and reviewable');
+    await pdfSuggestion.getByRole('button', { name: 'Remove' }).click();
     await page.getByRole('button', { name: 'Choose a role' }).focus(); await page.keyboard.press('Enter');
     await page.getByRole('button', { name: 'Prepare application draft' }).focus(); await page.keyboard.press('Enter');
     await page.getByRole('textbox', { name: 'Curriculum vitae' }).waitFor();
