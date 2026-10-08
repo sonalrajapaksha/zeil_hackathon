@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { DEMO_JOBS } from "@/lib/jobs";
-import { ConversationErrorSchema, ConversationResponseSchema, type CandidateProfile, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
+import { CLARIFICATION_REQUEST, ConversationErrorSchema, ConversationResponseSchema, type CandidateProfile, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
 import { EMPTY_INTERVIEW, progress } from "@/lib/interview";
 
 type Step = "welcome" | "story" | "application";
@@ -92,7 +92,8 @@ export default function Home() {
           return next;
         });
       }
-      setMessage(""); setCorrectionId(null);
+      if (request.action !== "clarify") setMessage("");
+      setCorrectionId(null);
       setAnnouncement(result.interview.status === "ended" ? "Interview ended. Your history is available for review." : result.suggestions.length ? `A new AI question and ${result.suggestions.length} profile suggestion${result.suggestions.length === 1 ? "" : "s"} to review are ready.` : "A new AI question is ready.");
       messageInput.current?.focus();
     } catch (failure) {
@@ -108,16 +109,28 @@ export default function Home() {
   }
 
   function begin() {
+    const questionStyle = profile.preferences.questionStyle;
+    if (!questionStyle) {
+      setAnnouncement("Choose simple or standard question wording before you begin.");
+      document.getElementById("question-style-simple")?.focus();
+      return;
+    }
     setStep("story");
-    if (!chat.length && !activeRequest.current) void requestTurn({ action: "start", history: [] });
+    if (!chat.length && !activeRequest.current) void requestTurn({ action: "start", history: [], questionStyle });
+  }
+
+  function startNewInterview() {
+    const questionStyle = profile.preferences.questionStyle;
+    if (questionStyle) void requestTurn({ action: "start", history: [], questionStyle });
   }
 
   function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!message.trim() || pending || interview.status === "ended") return;
+    const questionStyle = profile.preferences.questionStyle;
+    if (!questionStyle || !message.trim() || pending || interview.status === "ended") return;
     void requestTurn(correctionId
-      ? { action: "correct", history: chat, messageId: correctionId, answer: message.trim() }
-      : { action: "answer", history: chat, answer: message.trim() });
+      ? { action: "correct", history: chat, messageId: correctionId, answer: message.trim(), questionStyle }
+      : { action: "answer", history: chat, answer: message.trim(), questionStyle });
   }
 
   function endInterview() {
@@ -155,6 +168,16 @@ export default function Home() {
 
   function setPreference(name: keyof CandidateProfile["preferences"], checked: boolean) {
     setProfile((current) => ({ ...current, preferences: { ...current.preferences, [name]: checked } }));
+  }
+
+  function setQuestionStyle(questionStyle: "simple" | "standard") {
+    setProfile((current) => ({ ...current, preferences: { ...current.preferences, questionStyle } }));
+  }
+
+  function clarifyQuestion() {
+    const questionStyle = profile.preferences.questionStyle;
+    if (!questionStyle || pending || !chat.length || chat.at(-1)?.role !== "assistant" || chat.at(-2)?.content === CLARIFICATION_REQUEST) return;
+    void requestTurn({ action: "clarify", history: chat, questionStyle });
   }
 
   function addSkill(event: FormEvent<HTMLFormElement>) {
@@ -201,8 +224,12 @@ export default function Home() {
         <div className="top-actions">
           {step !== "welcome" && <button className="text-button reset-button" onClick={reset}>Reset session</button>}
           <details className="preferences">
-            <summary aria-label="Display preferences"><span className="settings-glyph" aria-hidden="true">Aa</span><span className="pref-label">Display</span></summary>
+            <summary aria-label="Communication and display preferences"><span className="settings-glyph" aria-hidden="true">Aa</span><span className="pref-label">Preferences</span></summary>
             <div className="pref-menu">
+              <fieldset className="question-style question-style-menu"><legend>Question wording</legend>
+                <label className={profile.preferences.questionStyle === "simple" ? "is-selected" : ""}><input type="radio" name="question-style-menu" value="simple" checked={profile.preferences.questionStyle === "simple"} onChange={() => setQuestionStyle("simple")} /> Simple</label>
+                <label className={profile.preferences.questionStyle === "standard" ? "is-selected" : ""}><input type="radio" name="question-style-menu" value="standard" checked={profile.preferences.questionStyle === "standard"} onChange={() => setQuestionStyle("standard")} /> Standard</label>
+              </fieldset>
               <label><input type="checkbox" checked={profile.preferences.largeText} onChange={(event) => setPreference("largeText", event.target.checked)} /> Larger text</label>
               <label><input type="checkbox" checked={profile.preferences.highContrast} onChange={(event) => setPreference("highContrast", event.target.checked)} /> Higher contrast</label>
               <label><input type="checkbox" checked={profile.preferences.reducedMotion} onChange={(event) => setPreference("reducedMotion", event.target.checked)} /> Reduce motion</label>
@@ -225,8 +252,15 @@ export default function Home() {
           <div className="welcome-copy">
             <p className="eyebrow"><span className="eyebrow-line" /> YOUR NEXT CHAPTER, ON YOUR TERMS</p>
             <h1 id="welcome-heading">Your experience<br />is <span>more than</span><br />a résumé.</h1>
-            <p className="welcome-intro">A conversation can make room for the things a form leaves out. Tell your story in your own words, then shape it into an application that sounds like you.</p>
-            <button className="button button-primary button-large" onClick={begin}>Start your interview <span aria-hidden="true">↗</span></button>
+            <p className="welcome-intro">Accessibility-first career support for everyone. Tell your story by text, choose how we word questions, then shape an application that sounds like you.</p>
+            <fieldset className="question-style welcome-style" aria-describedby="question-style-help"><legend>How should we ask questions?</legend>
+              <div className="question-style-choice">
+                <label className={profile.preferences.questionStyle === "simple" ? "is-selected" : ""}><input id="question-style-simple" type="radio" name="question-style-welcome" value="simple" checked={profile.preferences.questionStyle === "simple"} onChange={() => setQuestionStyle("simple")} /><span><strong>Simple</strong><small>Short sentences, familiar words</small></span></label>
+                <label className={profile.preferences.questionStyle === "standard" ? "is-selected" : ""}><input id="question-style-standard" type="radio" name="question-style-welcome" value="standard" checked={profile.preferences.questionStyle === "standard"} onChange={() => setQuestionStyle("standard")} /><span><strong>Standard</strong><small>Clear, natural conversation</small></span></label>
+              </div>
+              <p id="question-style-help">Choose one to begin. You can change this preference at any time.</p>
+            </fieldset>
+            <button className="button button-primary button-large" onClick={begin} disabled={!profile.preferences.questionStyle}>Start your interview <span aria-hidden="true">↗</span></button>
             <p className="sample-note"><span className="sample-dot" /> Text interview · you control what you share</p>
           </div>
           <div className="welcome-art" aria-label="Illustration of a growing career story">
@@ -247,14 +281,14 @@ export default function Home() {
             <section className={`conversation-pane${mobilePanel === "canvas" ? " mobile-hidden" : ""}`} aria-labelledby="conversation-heading">
               <div className="pane-heading"><div><span className="pane-index">A</span><h2 id="conversation-heading">In your words</h2></div><span className="small-label">AI CONVERSATION</span></div>
               <div ref={chatLog} className="chat-log" role="region" tabIndex={0} aria-label="Conversation history" aria-busy={pending}>
-                {chat.map((line) => <div key={line.id} className={`chat-line ${line.role === "user" ? "you" : "access"}`}><div className="avatar" aria-hidden="true">{line.role === "user" ? (profile.name?.[0] || "Y") : <Mark small />}</div><div><span className="speaker">{line.role === "user" ? "You" : "Access · Gemini"}</span><p>{line.content}</p>{line.role === "user" && line.content !== "[Question skipped by candidate]" && <button className="text-button" disabled={pending || interview.status === "ended"} onClick={() => { setCorrectionId(line.id); setMessage(line.content); setError(""); setFailedRequest(null); messageInput.current?.focus(); }}>Correct this answer</button>}</div></div>)}
+                {chat.map((line) => <div key={line.id} className={`chat-line ${line.role === "user" ? "you" : "access"}`}><div className="avatar" aria-hidden="true">{line.role === "user" ? (profile.name?.[0] || "Y") : <Mark small />}</div><div><span className="speaker">{line.role === "user" ? "You" : "Access · Gemini"}</span><p>{line.content === CLARIFICATION_REQUEST ? "Could you clarify this question?" : line.content}</p>{line.role === "user" && !["[Question skipped by candidate]", CLARIFICATION_REQUEST].includes(line.content) && <button className="text-button" disabled={pending || interview.status === "ended"} onClick={() => { setCorrectionId(line.id); setMessage(line.content); setError(""); setFailedRequest(null); messageInput.current?.focus(); }}>Correct this answer</button>}</div></div>)}
               </div>
               <p className="interview-status" role="status">{pending ? "Access is preparing a question…" : interview.status === "ended" ? "Interview ended. Your history is available above." : chat.length ? `Question ${interview.questions} of up to ${interview.limit} · ${interview.answered} answered` : "Start the interview to receive your first question."}</p>
               {error && <div className="interview-error"><p id="interview-error" role="alert">{error}</p><button className="button button-dark" disabled={pending || !failedRequest} onClick={() => failedRequest && void requestTurn(failedRequest)}>Retry</button></div>}
-              {!chat.length && !pending && !error && interview.status !== "ended" && <button className="button button-primary" onClick={() => void requestTurn({ action: "start", history: [] })}>Start interview</button>}
+              {!chat.length && !pending && !error && interview.status !== "ended" && <button className="button button-primary" disabled={!profile.preferences.questionStyle} onClick={begin}>Start interview</button>}
               <form className="message-form" onSubmit={sendMessage}><label htmlFor="message">{correctionId ? "Correct your answer" : "Add to your story"}</label>{correctionId && <p id="correction-help">Updating this answer replaces the questions and answers that came after it.</p>}<textarea ref={messageInput} id="message" value={message} onChange={(event) => { setMessage(event.target.value); setError(""); setFailedRequest(null); }} placeholder="Tell us about something you’ve done." rows={3} maxLength={4000} readOnly={pending} aria-invalid={!!error} aria-describedby={error ? "interview-error" : correctionId ? "correction-help" : undefined} /><div className="form-bottom"><span>Share only what you’re comfortable sharing.</span><button className="button button-primary" type="submit" disabled={pending || !message.trim() || !chat.length || interview.status === "ended"}>{pending ? "Please wait…" : correctionId ? "Save correction" : "Send answer"} <span aria-hidden="true">↑</span></button></div></form>
               <div className="prompt-row">
-                {interview.status !== "ended" ? <><button className="text-button" disabled={pending || !chat.length || !!correctionId} onClick={() => void requestTurn({ action: "skip", history: chat })}>Skip question</button><button className="text-button" onClick={endInterview}>End interview</button></> : <button className="text-button" disabled={pending} onClick={() => void requestTurn({ action: "start", history: [] })}>Start a new interview</button>}
+                {interview.status !== "ended" ? <><button className="text-button" disabled={pending || !chat.length || !!correctionId} onClick={() => void requestTurn({ action: "skip", history: chat, questionStyle: profile.preferences.questionStyle! })}>Skip question</button><button className="text-button" disabled={pending || !chat.length || !!correctionId || chat.at(-1)?.role !== "assistant" || chat.at(-2)?.content === CLARIFICATION_REQUEST} onClick={clarifyQuestion}>Clarify question</button><button className="text-button" onClick={endInterview}>End interview</button></> : <button className="text-button" disabled={pending || !profile.preferences.questionStyle} onClick={startNewInterview}>Start a new interview</button>}
                 {correctionId && <button className="text-button" disabled={pending} onClick={() => { setCorrectionId(null); setMessage(""); setError(""); setFailedRequest(null); }}>Cancel correction</button>}
               </div>
             </section>

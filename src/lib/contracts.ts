@@ -3,7 +3,7 @@ export const ExperienceSchema = z.object({ id:z.string(), organisation:z.string(
 export const ProfileSkillSchema = z.object({ id:z.string(), name:z.string(), evidence:z.string(), confirmed:z.boolean().default(false) });
 export const ProfileExperienceSchema = z.object({ id:z.string(), text:z.string(), evidence:z.array(z.string()), confirmed:z.boolean().default(false) });
 export const ProfileEducationSchema = z.object({ id:z.string(), text:z.string(), evidence:z.string(), confirmed:z.boolean().default(false) });
-export const CandidateProfileSchema = z.object({ name:z.string().optional(), summary:z.string().optional(), skills:z.array(ProfileSkillSchema), experience:z.array(z.union([ExperienceSchema, ProfileExperienceSchema])), education:z.array(ProfileEducationSchema), preferences:z.object({largeText:z.boolean(), highContrast:z.boolean(), reducedMotion:z.boolean()}) });
+export const CandidateProfileSchema = z.object({ name:z.string().optional(), summary:z.string().optional(), skills:z.array(ProfileSkillSchema), experience:z.array(z.union([ExperienceSchema, ProfileExperienceSchema])), education:z.array(ProfileEducationSchema), preferences:z.object({largeText:z.boolean(), highContrast:z.boolean(), reducedMotion:z.boolean(), questionStyle:z.enum(['simple','standard']).optional()}) });
 export const JobListingSchema = z.object({id:z.string(),title:z.string(),company:z.string(),location:z.string(),arrangement:z.string(),description:z.string(),requirements:z.array(z.string())});
 export const ConversationMessageSchema = z.object({id:z.string(),role:z.enum(['user','assistant']),content:z.string()});
 export const ApplicationPackageSchema = z.object({jobId:z.string(),cvText:z.string(),coverLetter:z.string(),unverifiedClaims:z.array(z.string()),generatedAt:z.string()});
@@ -13,10 +13,12 @@ export type ConversationMessage = z.infer<typeof ConversationMessageSchema>;
 export type ApplicationPackage = z.infer<typeof ApplicationPackageSchema>;
 
 export const INTERVIEW_LIMIT = 12;
+export const QuestionStyleSchema = z.enum(['simple', 'standard']);
+export const CLARIFICATION_REQUEST = '[Candidate requested clarification]';
 export const InterviewHistorySchema = z.array(ConversationMessageSchema.extend({
   id: z.string().min(1).max(100),
   content: z.string().trim().min(1).max(4000),
-}).strict()).max(INTERVIEW_LIMIT * 2 + 1).superRefine((history, ctx) => {
+}).strict()).max(INTERVIEW_LIMIT * 4 - 1).superRefine((history, ctx) => {
   if (new Set(history.map((message) => message.id)).size !== history.length)
     ctx.addIssue({ code: 'custom', message: 'Message IDs must be unique.' });
   history.forEach((message, index) => {
@@ -25,8 +27,9 @@ export const InterviewHistorySchema = z.array(ConversationMessageSchema.extend({
   });
 });
 export const ConversationRequestSchema = z.object({
-  action: z.enum(['start', 'answer', 'skip', 'correct', 'end']),
+  action: z.enum(['start', 'answer', 'skip', 'correct', 'clarify', 'end']),
   history: InterviewHistorySchema,
+  questionStyle: QuestionStyleSchema,
   answer: z.string().trim().min(1).max(4000).optional(),
   messageId: z.string().min(1).max(100).optional(),
 }).strict().superRefine((request, ctx) => {
@@ -34,7 +37,8 @@ export const ConversationRequestSchema = z.object({
   const fail = (message: string) => ctx.addIssue({ code: 'custom', message });
   if (action === 'start' && history.length) fail('Start requires an empty history.');
   if (action !== 'start' && !history.length) fail('Start the interview first.');
-  if ((action === 'answer' || action === 'skip') && history.at(-1)?.role !== 'assistant') fail('An answer requires a pending question.');
+  if ((action === 'answer' || action === 'skip' || action === 'clarify') && history.at(-1)?.role !== 'assistant') fail('This action requires a pending question.');
+  if (action === 'clarify' && history.at(-2)?.content === CLARIFICATION_REQUEST) fail('The pending question has already been clarified.');
   if ((action === 'answer' || action === 'correct') !== (answer !== undefined)) fail('Provide an answer only for answer or correct.');
   if (action === 'correct') {
     if (!history.some((message) => message.id === messageId && message.role === 'user')) fail('Choose a previous answer to correct.');

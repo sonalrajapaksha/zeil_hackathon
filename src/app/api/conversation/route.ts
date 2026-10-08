@@ -1,6 +1,6 @@
 import { GoogleGenAI, ApiError } from '@google/genai';
 import { z } from 'zod';
-import { ConversationRequestSchema, ConversationResponseSchema, INTERVIEW_LIMIT, type ConversationErrorSchema } from '../../../lib/contracts.ts';
+import { CLARIFICATION_REQUEST, ConversationRequestSchema, ConversationResponseSchema, INTERVIEW_LIMIT, type ConversationErrorSchema } from '../../../lib/contracts.ts';
 import { END_REPLY, prepareTurn, progress } from '../../../lib/interview.ts';
 
 export const runtime = 'nodejs';
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   }
 
   const history = prepareTurn(input);
-  if (input.action === 'end' || history.filter((message) => message.role === 'assistant').length >= INTERVIEW_LIMIT) {
+  if (input.action === 'end' || input.action !== 'clarify' && progress(history).questions >= INTERVIEW_LIMIT) {
     return Response.json(ConversationResponseSchema.parse({ reply: END_REPLY, suggestions: [], history, interview: progress(history, true) }), { headers: { 'Cache-Control': 'no-store' } });
   }
   const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -63,10 +63,10 @@ export async function POST(request: Request) {
     const response = await ai.models.generateContent({
       model,
       contents: history.length ? history.map((message) => ({
-        role: message.role === 'assistant' ? 'model' : 'user', parts: [{ text: message.content }],
+        role: message.role === 'assistant' ? 'model' : 'user', parts: [{ text: message.content === CLARIFICATION_REQUEST ? 'The candidate requests clarification of the current interview question. Briefly explain it and repeat the same question. This request is not an answer.' : message.content }],
       })) : [{ role: 'user', parts: [{ text: 'Start my career interview.' }] }],
       config: {
-        systemInstruction: SYSTEM,
+        systemInstruction: `${SYSTEM}\nQuestion style: ${input.questionStyle === 'simple' ? 'simple — use familiar words, short sentences, and explain uncommon terms.' : 'standard — use clear, natural conversational wording without unnecessary jargon.'}${input.action === 'clarify' ? '\nThe latest turn is a dedicated clarification request. Briefly explain the current question, then restate that same question. Do not introduce a new topic or suggest profile claims.' : ''}`,
         temperature: 0.5,
         maxOutputTokens: 1024,
         // Reserve the small output budget for the question on the default Flash model.
@@ -83,12 +83,12 @@ export async function POST(request: Request) {
       if (response.candidates?.[0]?.finishReason !== 'STOP') throw new Error('Incomplete or refused');
       const modelOutput = ModelOutputSchema.parse(JSON.parse(response.text ?? ''));
       ({ reply } = modelOutput);
-      const latestAnswer = history.at(-1)?.role === 'user' && history.at(-1)?.content !== '[Question skipped by candidate]' ? history.at(-1)!.content : '';
+      const latestAnswer = input.action !== 'clarify' && history.at(-1)?.role === 'user' && !['[Question skipped by candidate]', CLARIFICATION_REQUEST].includes(history.at(-1)!.content) ? history.at(-1)!.content : '';
       suggestions = latestAnswer ? modelOutput.suggestions : [];
       if (suggestions.some(({ evidence }) => !latestAnswer.toLocaleLowerCase().includes(evidence.toLocaleLowerCase()))) throw new Error('Evidence is not quoted from the latest answer');
       const normalise = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
       const question = normalise(reply.slice(0, -1).split(/[.!]/).at(-1) ?? reply);
-      if (history.some((message) => message.role === 'assistant' && normalise(message.content.slice(0, -1).split(/[.!]/).at(-1) ?? message.content) === question)) throw new Error('Repeated question');
+      if (input.action !== 'clarify' && history.some((message) => message.role === 'assistant' && normalise(message.content.slice(0, -1).split(/[.!]/).at(-1) ?? message.content) === question)) throw new Error('Repeated question');
     } catch {
       return failure('INVALID_RESPONSE', 'The AI could not return a usable question. Your story is unchanged. Please retry or end the interview.', 502, true);
     }

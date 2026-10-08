@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, test, mock } from 'node:test';
 import { POST } from '../src/app/api/conversation/route.ts';
-import { ConversationRequestSchema, ConversationResponseSchema, INTERVIEW_LIMIT } from '../src/lib/contracts.ts';
+import { CLARIFICATION_REQUEST, ConversationRequestSchema, ConversationResponseSchema, INTERVIEW_LIMIT } from '../src/lib/contracts.ts';
 import { prepareTurn } from '../src/lib/interview.ts';
 
 const originalKey = process.env.GEMINI_API_KEY;
@@ -29,7 +29,7 @@ function fakeGemini(reply = 'What did you enjoy about helping library visitors?'
 test('start returns typed initial question and bounded SDK configuration', async () => {
   delete process.env.GEMINI_MODEL;
   const sdk = fakeGemini('What is one experience you would like to tell me about?');
-  const response = await POST(request({ action: 'start', history: [] }));
+  const response = await POST(request({ action: 'start', history: [], questionStyle: 'standard' }));
   assert.equal(response.status, 200);
   const result = ConversationResponseSchema.parse(await response.json());
   assert.equal(result.history.length, 1);
@@ -41,6 +41,7 @@ test('start returns typed initial question and bounded SDK configuration', async
   const sent = JSON.parse(String(init!.body));
   assert.equal(sent.generationConfig.responseMimeType, 'application/json');
   assert.equal(sent.generationConfig.maxOutputTokens, 1024);
+  assert.match(sent.systemInstruction.parts[0].text, /Question style: standard/);
   assert.ok(init!.signal);
   assert.ok(!JSON.stringify(result).includes('test-secret'));
 });
@@ -48,7 +49,7 @@ test('start returns typed initial question and bounded SDK configuration', async
 test('follow-up sends actual context and retains history in order', async () => {
   process.env.GEMINI_MODEL = 'another-enabled-model';
   const sdk = fakeGemini();
-  const body = { action: 'answer', history: [question], answer: answer.content };
+  const body = { action: 'answer', history: [question], answer: answer.content, questionStyle: 'simple' };
   const snapshot = JSON.stringify(body);
   const response = await POST(request(body));
   const result = ConversationResponseSchema.parse(await response.json());
@@ -60,12 +61,13 @@ test('follow-up sends actual context and retains history in order', async () => 
   const sent = JSON.parse(String(sdk.mock.calls[0].arguments[1]!.body));
   assert.deepEqual(sent.contents.map((item: {role:string}) => item.role), ['model', 'user']);
   assert.equal(sent.contents[1].parts[0].text, answer.content);
+  assert.match(sent.systemInstruction.parts[0].text, /Question style: simple/);
   assert.equal(sentThinking(sdk.mock.calls[0].arguments[1]), undefined);
 });
 
 test('profile suggestions carry exact answer evidence and unsupported evidence fails safely', async () => {
   fakeGemini('What did you learn from volunteering?', [{ kind: 'skill', text: 'Library volunteering', evidence: 'volunteer at a library' }]);
-  const body = { action: 'answer', history: [question], answer: answer.content };
+  const body = { action: 'answer', history: [question], answer: answer.content, questionStyle: 'standard' };
   const accepted = ConversationResponseSchema.parse(await (await POST(request(body))).json());
   assert.deepEqual(accepted.suggestions, [{ kind: 'skill', text: 'Library volunteering', evidence: 'volunteer at a library' }]);
 
@@ -79,24 +81,40 @@ test('profile suggestions carry exact answer evidence and unsupported evidence f
 
 test('skip is explicit; correction removes stale answers without mutating original history', async () => {
   fakeGemini();
-  const skip = ConversationResponseSchema.parse(await (await POST(request({ action: 'skip', history: [question] }))).json());
+  const skip = ConversationResponseSchema.parse(await (await POST(request({ action: 'skip', history: [question], questionStyle: 'standard' }))).json());
   assert.equal(skip.interview.answered, 0);
   assert.equal(skip.history[1].content, '[Question skipped by candidate]');
   const history = [question, answer, { ...question, id: 'q2', content: 'What did you do there?' }, { ...answer, id: 'a2', content: 'I helped visitors.' }, { ...question, id: 'q3', content: 'What did you learn?' }];
-  const corrected = prepareTurn(ConversationRequestSchema.parse({ action: 'correct', history, messageId: 'a1', answer: 'I volunteer at a food bank.' }));
+  const corrected = prepareTurn(ConversationRequestSchema.parse({ action: 'correct', history, messageId: 'a1', answer: 'I volunteer at a food bank.', questionStyle: 'standard' }));
   assert.equal(corrected.length, 2);
   assert.equal(corrected[1].content, 'I volunteer at a food bank.');
   assert.equal(history.length, 5);
   assert.equal(history[1].content, answer.content);
 });
 
+test('clarification repeats the pending question without counting an answer or extracting claims', async () => {
+  const sdk = fakeGemini(question.content, [{ kind: 'skill', text: 'Fabricated skill', evidence: 'What experience' }]);
+  const response = await POST(request({ action: 'clarify', history: [question], questionStyle: 'simple' }));
+  assert.equal(response.status, 200);
+  const result = ConversationResponseSchema.parse(await response.json());
+  assert.deepEqual(result.suggestions, []);
+  assert.equal(result.interview.questions, 1);
+  assert.equal(result.interview.answered, 0);
+  assert.equal(result.history[1].content, CLARIFICATION_REQUEST);
+  assert.equal(result.history[2].content, question.content);
+  const sent = JSON.parse(String(sdk.mock.calls[0].arguments[1]!.body));
+  assert.match(sent.contents[1].parts[0].text, /requests clarification/);
+  assert.match(sent.systemInstruction.parts[0].text, /dedicated clarification request/);
+  assert.equal((await POST(request({ action: 'clarify', history: result.history, questionStyle: 'simple' }))).status, 400, 'Only one clarification is allowed for each pending question.');
+});
+
 test('end works without credentials; final turn ends at the deterministic limit', async () => {
   delete process.env.GEMINI_API_KEY;
-  const ended = ConversationResponseSchema.parse(await (await POST(request({ action: 'end', history: [question, answer] }))).json());
+  const ended = ConversationResponseSchema.parse(await (await POST(request({ action: 'end', history: [question, answer], questionStyle: 'standard' }))).json());
   assert.equal(ended.interview.status, 'ended');
   assert.deepEqual(ended.history, [question, answer]);
   const history = Array.from({ length: INTERVIEW_LIMIT * 2 - 1 }, (_, index) => ({ id: `m${index}`, role: index % 2 ? 'user' : 'assistant', content: index % 2 ? 'An answer.' : `Question ${index}?` }));
-  const last = ConversationResponseSchema.parse(await (await POST(request({ action: 'answer', history, answer: 'Final answer.' }))).json());
+  const last = ConversationResponseSchema.parse(await (await POST(request({ action: 'answer', history, answer: 'Final answer.', questionStyle: 'standard' }))).json());
   assert.equal(last.interview.status, 'ended');
   assert.equal(last.interview.questions, INTERVIEW_LIMIT);
   assert.equal(last.history.length, INTERVIEW_LIMIT * 2);
@@ -105,13 +123,13 @@ test('end works without credentials; final turn ends at the deterministic limit'
 test('invalid requests, oversized bodies and malformed JSON are rejected before Gemini', async () => {
   const sdk = fakeGemini();
   for (const body of [
-    {}, { action: 'answer', history: [question], answer: ' ' },
-    { action: 'start', history: [question] }, { action: 'answer', history: [answer], answer: 'hello' },
-    { action: 'correct', history: [question, answer], messageId: 'q1', answer: 'hello' },
-    { action: 'answer', history: [question], answer: 'a'.repeat(4001) },
-    { action: 'start', history: [], key: 'never-accept-client-keys' },
-    { action: 'end', history: [question, answer, question] },
-    { action: 'start', history: [], padding: 'a'.repeat(64_001) },
+    {}, { action: 'answer', history: [question], answer: ' ', questionStyle: 'standard' },
+    { action: 'start', history: [question], questionStyle: 'standard' }, { action: 'answer', history: [answer], answer: 'hello', questionStyle: 'standard' },
+    { action: 'correct', history: [question, answer], messageId: 'q1', answer: 'hello', questionStyle: 'standard' },
+    { action: 'answer', history: [question], answer: 'a'.repeat(4001), questionStyle: 'standard' },
+    { action: 'start', history: [], questionStyle: 'standard', key: 'never-accept-client-keys' },
+    { action: 'end', history: [question, answer, question], questionStyle: 'standard' },
+    { action: 'start', history: [], questionStyle: 'standard', padding: 'a'.repeat(64_001) },
   ]) assert.equal((await POST(request(body))).status, 400);
   assert.equal((await POST(new Request('http://localhost', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{' }))).status, 400);
   assert.equal(sdk.mock.calls.length, 0);
@@ -119,7 +137,7 @@ test('invalid requests, oversized bodies and malformed JSON are rejected before 
 
 test('missing key produces helpful error without revealing secrets', async () => {
   delete process.env.GEMINI_API_KEY;
-  const response = await POST(request({ action: 'start', history: [] }));
+  const response = await POST(request({ action: 'start', history: [], questionStyle: 'standard' }));
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error.code, 'NOT_CONFIGURED');
 });
@@ -128,7 +146,7 @@ test('malformed, blank, multiple and repeated model questions fail safely', asyn
   process.env.GEMINI_API_KEY = 'test-secret';
   for (const text of ['not json', JSON.stringify({ reply: '' }), JSON.stringify({ reply: 'Two questions? Really?' }), JSON.stringify({ reply: question.content })]) {
     const sdk = mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }] })));
-    const response = await POST(request({ action: 'answer', history: [question], answer: answer.content }));
+    const response = await POST(request({ action: 'answer', history: [question], answer: answer.content, questionStyle: 'standard' }));
     assert.equal(response.status, 502);
     assert.equal((await response.json()).error.code, 'INVALID_RESPONSE');
     sdk.mock.restore();
@@ -137,7 +155,7 @@ test('malformed, blank, multiple and repeated model questions fail safely', asyn
 
 test('provider errors, refusal and timeout preserve request; exact retry works', async () => {
   process.env.GEMINI_API_KEY = 'test-secret';
-  const body = { action: 'answer', history: [question], answer: answer.content };
+  const body = { action: 'answer', history: [question], answer: answer.content, questionStyle: 'standard' };
   const original = JSON.stringify(body);
   for (const [failure, status, code] of [
     [new Error('secret upstream details'), 502, 'PROVIDER_ERROR'],

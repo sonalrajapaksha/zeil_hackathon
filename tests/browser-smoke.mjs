@@ -19,7 +19,9 @@ globalThis.fetch = async (_url, init) => {
   if (failNext) { failNext = false; throw new Error('mock provider failure'); }
   const body = JSON.parse(init.body);
   const text = body.contents.at(-1).parts[0].text;
-  const reply = body.contents.length === 1 ? 'What experience would you like to share?' : `Thinking about ${text.slice(0, 70)}, what did you learn in example ${calls}?`;
+  const previousQuestion = [...body.contents.slice(0, -1)].reverse().find((item) => item.role === 'model')?.parts[0].text;
+  const clarification = text.includes('requests clarification');
+  const reply = body.contents.length === 1 ? 'What experience would you like to share?' : clarification ? previousQuestion : `Thinking about ${text.slice(0, 70)}, what did you learn in example ${calls}?`;
   const suggestions = text === 'I volunteer at a library.'
     ? [{ kind: 'skill', text: 'Library volunteering', evidence: 'volunteer at a library' }]
     : text === 'I helped organise donations.'
@@ -38,7 +40,7 @@ try {
     await page.keyboard.press('Tab');
     assert.equal(await page.getByRole('link', { name: 'Skip to main content' }).evaluate((link) => getComputedStyle(link).clipPath), 'inset(100%)');
     // Verify the actual HTTP endpoint's missing-key error before mocking Gemini.
-    const real = await page.request.post(`${baseURL}/api/conversation`, { data: { action: 'start', history: [] } });
+    const real = await page.request.post(`${baseURL}/api/conversation`, { data: { action: 'start', history: [], questionStyle: 'standard' } });
     assert.equal(real.status(), 503);
     assert.equal((await real.json()).error.code, 'NOT_CONFIGURED');
     await page.route('**/api/conversation', async (route) => {
@@ -47,19 +49,28 @@ try {
       }));
       await route.fulfill({ status: response.status, contentType: 'application/json', body: await response.text() });
     });
+    assert.equal(await page.getByRole('button', { name: 'Start your interview' }).isDisabled(), true);
+    await page.getByRole('radio', { name: /Simple/ }).check();
+    assert.equal(await page.getByRole('button', { name: 'Start your interview' }).isDisabled(), false);
     await page.getByRole('button', { name: 'Start your interview' }).focus();
     await page.keyboard.press('Enter');
     await page.getByText('What experience would you like to share?', { exact: true }).waitFor();
     assert.equal(await page.locator('.chat-line').count(), 1);
     await page.getByLabel('Add to your story').fill('I volunteer at a library.');
+    await page.getByRole('button', { name: 'Clarify question' }).click();
+    await page.getByText('Question 1 of up to 12 · 0 answered').waitFor();
+    assert.equal(await page.getByLabel('Add to your story').inputValue(), 'I volunteer at a library.');
+    assert.equal(await page.locator('.chat-line').count(), 3);
+    await page.getByText('Could you clarify this question?', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Clarify question' }).isDisabled(), true);
     failNext = true;
     await page.getByRole('button', { name: 'Send answer' }).click();
     await page.getByRole('alert').waitFor();
     assert.equal(await page.getByLabel('Add to your story').inputValue(), 'I volunteer at a library.');
-    assert.equal(await page.locator('.chat-line').count(), 1);
+    assert.equal(await page.locator('.chat-line').count(), 3);
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await page.getByText(/Question 2 of up to/).waitFor();
-    assert.equal(await page.locator('.chat-line').count(), 3);
+    assert.equal(await page.locator('.chat-line').count(), 5);
     if (width === 320) await page.getByRole('button', { name: /Career canvas/ }).click();
     assert.equal(await page.getByLabel('Suggested skill').inputValue(), 'Library volunteering');
     await page.getByText('“volunteer at a library”').waitFor();
@@ -72,7 +83,7 @@ try {
     await page.getByRole('button', { name: 'Save correction' }).click();
     await page.getByLabel('Add to your story').waitFor();
     await page.getByText('I volunteer at a food bank.', { exact: true }).waitFor();
-    assert.equal(await page.locator('.chat-line').count(), 3);
+    assert.equal(await page.locator('.chat-line').count(), 5);
     assert.equal(await page.getByText('I volunteer at a library.', { exact: true }).count(), 0);
     await page.getByRole('button', { name: 'Skip question' }).click();
     await page.getByText(/Question 3 of up to/).waitFor();
@@ -103,6 +114,8 @@ try {
     assert.doesNotMatch(await page.getByLabel('Curriculum vitae').inputValue(), /Organising donations/);
     assert.match(await page.getByLabel('Curriculum vitae').inputValue(), /Event planning/, 'Candidate-added confirmed skill remains available');
     await page.getByRole('button', { name: 'Reset session' }).click();
+    assert.equal(await page.getByRole('button', { name: 'Start your interview' }).isDisabled(), true);
+    await page.getByRole('radio', { name: /Standard/ }).check();
     release = () => {};
     await page.getByRole('button', { name: 'Start your interview' }).click();
     await page.getByRole('button', { name: 'Please wait…' }).waitFor();
