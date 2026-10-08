@@ -7,7 +7,7 @@ Current milestone: M2 conversational AI; live Gemini flow verified. No ZEIL bonu
 | 02 | PASS | `d0847e6` implementation; current follow-up fix in Git log | Typecheck, 8 mocked test groups, production build, desktop/mobile browser smoke, real Gemini start/follow-up/end PASS | — |
 | 03 | PASS | `4aaae34` | Typecheck, 9 unit groups, production build, browser smoke at 1280px/320px, genuine Gemini extraction/follow-up PASS | — |
 | 04 | PASS | `8372517` (sensitive-screen follow-up) | `npm run typecheck`, `npm test` (16 test cases), `npm run build`, browser smoke at 1280px/320px, genuine Gemini application draft with input/output semantic screens PASS | Automated semantic screening can still make false negatives; candidate review remains required |
-| 05 | PASS | `062636a` | `npm run typecheck`, `npm test` (18 cases), `npm run build`, mocked browser smoke at 1280px/320px | Full screen-reader and 200% zoom audit remains Task 06 |
+| 05 | PASS | `251e75b` | `npm run typecheck`, `npm test` (18 cases), `npm run build`, mocked browser smoke at 1280px/320px | Full screen-reader and 200% zoom audit remains Task 06 |
 | 06 | TODO | — | — | — |
 | 07 | TODO | — | — | — |
 | 08 | TODO | — | — | — |
