@@ -7,10 +7,10 @@ Set server-only values in the ignored `.env.local`:
 
 ```dotenv
 GEMINI_API_KEY=your-own-key
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.8-flash
 ```
 
-The model is configurable; choose one enabled for your Gemini account. The default is `gemini-2.5-flash`. Restart Next.js after changing environment values. Never use a `NEXT_PUBLIC_` key variable.
+The model is configurable; choose one enabled for your Gemini account. The default is `gemini-3.8-flash`. Restart Next.js after changing environment values. Never use a `NEXT_PUBLIC_` key variable.
 Run `npm run dev`, then start an interview. The UI discloses transmission to Google Gemini. Access stores the session only in browser memory; reload/reset clears it. No candidate history or provider errors are logged by the route. Google provider retention is governed by your account terms.
 
 ## API and state
@@ -23,7 +23,7 @@ Run `npm run dev`, then start an interview. The UI discloses transmission to Goo
 
 For subsequent turns, submit the returned `history` with `action: "answer"` and `answer`, or `action: "skip"`. For corrections, use `action: "correct"`, the previous user `messageId`, and the replacement `answer`. Correction removes subsequent turns so outdated details do not remain model context. `action: "end"` returns ended progress without calling Gemini. The UI also permits immediate local ending/reset during a pending request.
 
-Success returns `{reply, suggestions: [], history, interview: {status, answered, questions, limit}}`. Errors return `{error: {code, message, retryable}}`; no state is committed. Retry resubmits the same turn. Skips do not count as answers. Interviews allow up to 12 questions; the last answer ends the session deterministically. No database or server session is needed. History, IDs, ordering, answer size, total request body and model output are validated. Generation is bounded to 1,024 tokens, 30 seconds and one attempt; thinking is disabled specifically for Gemini 2.5 Flash so reasoning does not consume the small question budget (see [Google thinking configuration](https://ai.google.dev/gemini-api/docs/generate-content/thinking)); the UI has a 35-second deadline. Exact repeated questions are rejected; semantic repetition remains a model-quality limitation.
+Success returns `{reply, suggestions: [], history, interview: {status, answered, questions, limit}}`. Errors return `{error: {code, message, retryable}}`; no state is committed. Retry resubmits the same turn. Skips do not count as answers. Interviews allow up to 12 questions; the last answer ends the session deterministically. No database or server session is needed. History, IDs, ordering, answer size, total request body and model output are validated. Generation is bounded to 1,024 tokens, 30 seconds and one attempt; the UI has a 35-second deadline. Exact repeated questions are rejected; semantic repetition remains a model-quality limitation.
 
 The model receives one system instruction plus the alternating conversation transcript. The route requests schema-constrained JSON and validates the output again with Zod. Prompt constraints forbid sensitive inference and fabrication; these instructions reduce risk but cannot certify all generated language. Career profile extraction/approval belongs to Task 03. Existing application screens remain labeled local demo drafts.
 

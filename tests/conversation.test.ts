@@ -27,7 +27,7 @@ function fakeGemini(reply = 'What did you enjoy about helping library visitors?'
 }
 
 test('start returns typed initial question and bounded SDK configuration', async () => {
-  process.env.GEMINI_MODEL = 'gemini-2.5-flash';
+  delete process.env.GEMINI_MODEL;
   const sdk = fakeGemini('What is one experience you would like to tell me about?');
   const response = await POST(request({ action: 'start', history: [] }));
   assert.equal(response.status, 200);
@@ -36,8 +36,8 @@ test('start returns typed initial question and bounded SDK configuration', async
   assert.equal(result.interview.questions, 1);
   assert.deepEqual(result.suggestions, []);
   const [url, init] = sdk.mock.calls[0].arguments;
-  assert.match(String(url), /gemini-2.5-flash/);
-  assert.equal(sentThinking(init), 0);
+  assert.match(String(url), /gemini-3.8-flash/);
+  assert.equal(sentThinking(init), undefined);
   const sent = JSON.parse(String(init!.body));
   assert.equal(sent.generationConfig.responseMimeType, 'application/json');
   assert.equal(sent.generationConfig.maxOutputTokens, 1024);

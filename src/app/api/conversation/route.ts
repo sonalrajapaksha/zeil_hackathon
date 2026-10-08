@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const model = process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
+    const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
     const response = await ai.models.generateContent({
       model,
       contents: history.length ? history.map((message) => ({
@@ -90,6 +90,8 @@ export async function POST(request: Request) {
       return failure('TIMEOUT', 'The AI took too long. Your story is unchanged. Please retry.', 504, true);
     if (error instanceof ApiError && error.status === 429)
       return failure('RATE_LIMITED', 'The AI is busy or its quota has been reached. Please wait before retrying, or ask the demo host to check the quota.', 429, true);
+    if (error instanceof ApiError && [400, 401, 403, 404].includes(error.status ?? 0))
+      return failure('PROVIDER_ERROR', 'Gemini rejected this request. Ask the demo host to check the server API key and ensure GEMINI_MODEL is available and supports JSON responses.', 502);
     return failure('PROVIDER_ERROR', 'The AI is unavailable. Your story is unchanged. Please retry; if this continues, ask the demo host to check the server model and API key.', 502, true);
   }
 }
