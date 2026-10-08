@@ -5,7 +5,7 @@ Current milestone: M2 conversational AI; live Gemini flow verified. No ZEIL bonu
 |---|---|---|---|---|
 | 01 | PASS (UI/build); visual screenshot QA unavailable | `fc779a3` | `npm run typecheck` PASS; `npm run build` PASS; local `curl` HTTP 200 | Browser-control tool unavailable in this session, so desktop/mobile screenshots and interactive browser QA remain outstanding |
 | 02 | PASS | `d0847e6` implementation; current follow-up fix in Git log | Typecheck, 8 mocked test groups, production build, desktop/mobile browser smoke, real Gemini start/follow-up/end PASS | — |
-| 03 | TODO | — | — | — |
+| 03 | PASS | pending | Typecheck, 9 unit groups, production build, browser smoke at 1280px/320px, genuine Gemini extraction/follow-up PASS | — |
 | 04 | TODO | — | — | — |
 | 05 | TODO | — | — | — |
 | 06 | TODO | — | — | — |
@@ -27,6 +27,16 @@ Current milestone: M2 conversational AI; live Gemini flow verified. No ZEIL bonu
 - Next task after approval: Task 02, Gemini conversation backend.
 
 When completing a task record: actual changed files, exact test commands/outcomes, verified demo evidence, what is still missing, and which task should run next. Never mark “claimed” before submission and judge review.
+
+## Task 03 handoff
+
+- Implemented: Gemini conversation responses now carry up to five typed skill, experience, or education proposals with quoted evidence from the latest candidate answer. Zod validates the response; the server rejects evidence that is not present in that answer and suppresses proposals on start, skip, and end turns. Suggestions begin unconfirmed.
+- The Living Career Canvas now uses `CandidateProfile` as its source of truth, shows the claim type and source quotation, and allows candidates to edit, approve, or remove proposals. Corrections discard stale unapproved proposals tied to replaced answers. Candidate-added skills are explicitly sourced as “Added by you” and confirmed by the candidate action. Only confirmed profile items enter the existing draft builder; no employer communication or disability/medical inference was added.
+- Changed files: `src/lib/contracts.ts`, `src/app/api/conversation/route.ts`, `src/app/page.tsx`, `src/app/styles.css`, `tests/conversation.test.ts`, `tests/browser-smoke.mjs`, `tests/gemini-smoke.ts`, `docs/PROGRESS.md`. Existing user changes in `README.md` were left untouched and excluded from the Task 03 commit.
+- Checks: `npm run typecheck` PASS; `npm test` PASS (9 test groups, including grounded evidence and unsupported evidence rejection); `npm run build` PASS; `npm run test:gemini` PASS with a genuine Gemini start, contextual follow-up, three evidence-grounded proposals, and end; `ACCESS_TEST_URL=http://localhost:3004 PLAYWRIGHT_MODULE=/Users/sonalrajapaksha/.npm/_npx/420ff84f11983ee5/node_modules/playwright/index.mjs npm run test:browser` PASS at 1280px and 320px. Browser flow checked keyboard navigation, proposal source/edit/approval, stale-pending correction cleanup, omission of an unapproved experience from the draft, candidate-added confirmed content, reset, and no horizontal overflow/runtime errors. Screenshots `/tmp/access-task02-1280.png` and `/tmp/access-task02-320.png` were inspected; they captured the desktop profile and mobile conversation states.
+- Impeccable detector reported the incumbent Space Grotesk font as overused; kept it because `docs/DESIGN.md` explicitly specifies it. No bonus claims were marked verified.
+- Remaining: profile and conversation remain in browser memory only; persistence/export enhancements remain Task 05. The application draft is still the clearly labeled prepared demo format pending Task 04. Full screen-reader and 200% zoom audit remain Task 06.
+- Next task: Task 04, grounded CV and cover letter, only when separately requested/approved.
 
 ## Task 02 handoff
 

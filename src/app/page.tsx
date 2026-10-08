@@ -2,20 +2,22 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { DEMO_JOBS } from "@/lib/jobs";
-import { ConversationErrorSchema, ConversationResponseSchema, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
+import { ConversationErrorSchema, ConversationResponseSchema, type CandidateProfile, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
 import { EMPTY_INTERVIEW, progress } from "@/lib/interview";
 
 type Step = "welcome" | "story" | "application";
-type Note = { id: number; text: string; status: "pending" | "confirmed" };
+type ClaimKind = "skill" | "experience" | "education";
+type Claim = { id: string; kind: ClaimKind; text: string; evidence: string; confirmed: boolean };
+function emptyProfile(): CandidateProfile {
+  return { skills: [], experience: [], education: [], preferences: { largeText: false, highContrast: false, reducedMotion: false } };
+}
 function Mark({ small = false }: { small?: boolean }) {
   return <span className={`mark${small ? " mark-small" : ""}`} aria-hidden="true"><span /><span /><span /></span>;
 }
 
 export default function Home() {
   const [step, setStep] = useState<Step>("welcome");
-  const [largeText, setLargeText] = useState(false);
-  const [highContrast, setHighContrast] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
+  const [profile, setProfile] = useState<CandidateProfile>(emptyProfile);
   const [mobilePanel, setMobilePanel] = useState<"conversation" | "canvas">("conversation");
   const [chat, setChat] = useState<ConversationMessage[]>([]);
   const [interview, setInterview] = useState(EMPTY_INTERVIEW);
@@ -30,15 +32,18 @@ export default function Home() {
     if (chatLog.current) chatLog.current.scrollTop = chatLog.current.scrollHeight;
   }, [chat]);
   const [message, setMessage] = useState("");
-  const [notes, setNotes] = useState<Note[]>([]);
+  const claims = useMemo<Claim[]>(() => [
+    ...profile.skills.map((item) => ({ id: item.id, kind: "skill" as const, text: item.name, evidence: item.evidence, confirmed: item.confirmed })),
+    ...profile.experience.map((item) => ({ id: item.id, kind: "experience" as const, text: "text" in item ? item.text : [item.role, item.organisation].filter(Boolean).join(" · "), evidence: item.evidence.join(" · "), confirmed: item.confirmed })),
+    ...profile.education.map((item) => ({ id: item.id, kind: "education" as const, text: item.text, evidence: item.evidence, confirmed: item.confirmed })),
+  ], [profile]);
+  const confirmed = useMemo(() => claims.filter((claim) => claim.confirmed), [claims]);
   const [skillDraft, setSkillDraft] = useState("");
-  const [candidateName, setCandidateName] = useState("");
   const [selectedJob, setSelectedJob] = useState(DEMO_JOBS[0].id);
   const [cv, setCv] = useState("");
   const [letter, setLetter] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const selected = DEMO_JOBS.find((job) => job.id === selectedJob)!;
-  const confirmed = useMemo(() => notes.filter((note) => note.status === "confirmed"), [notes]);
 
   async function requestTurn(request: ConversationRequest) {
     if (activeRequest.current) return;
@@ -62,8 +67,33 @@ export default function Home() {
       const result = parsed.data;
       if (activeRequest.current !== controller) return;
       setChat(result.history); setInterview(result.interview);
+      if (request.action === "correct") {
+        const remainingAnswers = new Map(result.history.filter((item) => item.role === "user").map((item) => [item.id, item.content]));
+        const replacedAnswers = request.history.filter((item) => item.role === "user" && remainingAnswers.get(item.id) !== item.content).map((item) => item.content);
+        if (replacedAnswers.length) setProfile((current) => ({
+          ...current,
+          skills: current.skills.filter((item) => item.confirmed || !replacedAnswers.some((answer) => answer.includes(item.evidence))),
+          experience: current.experience.filter((item) => item.confirmed || !replacedAnswers.some((answer) => item.evidence.some((evidence) => answer.includes(evidence)))),
+          education: current.education.filter((item) => item.confirmed || !replacedAnswers.some((answer) => answer.includes(item.evidence))),
+        }));
+      }
+      if (result.suggestions.length) {
+        const incoming = result.suggestions.map((suggestion) => ({ ...suggestion, id: crypto.randomUUID(), confirmed: false }));
+        setProfile((current) => {
+          const next = { ...current, skills: [...current.skills], experience: [...current.experience], education: [...current.education] };
+          for (const item of incoming) {
+            const currentClaims = [...next.skills.map((claim) => ({ kind: "skill", text: claim.name })), ...next.experience.map((claim) => ({ kind: "experience", text: "text" in claim ? claim.text : claim.role })), ...next.education.map((claim) => ({ kind: "education", text: claim.text }))];
+            const duplicate = currentClaims.some((claim) => claim.kind === item.kind && claim.text.toLocaleLowerCase() === item.text.toLocaleLowerCase());
+            if (duplicate) continue;
+            if (item.kind === "skill") next.skills.push({ id: item.id, name: item.text, evidence: item.evidence, confirmed: false });
+            else if (item.kind === "experience") next.experience.push({ id: item.id, text: item.text, evidence: [item.evidence], confirmed: false });
+            else next.education.push({ id: item.id, text: item.text, evidence: item.evidence, confirmed: false });
+          }
+          return next;
+        });
+      }
       setMessage(""); setCorrectionId(null);
-      setAnnouncement(result.interview.status === "ended" ? "Interview ended. Your history is available for review." : "A new AI question is ready.");
+      setAnnouncement(result.interview.status === "ended" ? "Interview ended. Your history is available for review." : result.suggestions.length ? `A new AI question and ${result.suggestions.length} profile suggestion${result.suggestions.length === 1 ? "" : "s"} to review are ready.` : "A new AI question is ready.");
       messageInput.current?.focus();
     } catch (failure) {
       if (activeRequest.current !== controller) return;
@@ -97,15 +127,41 @@ export default function Home() {
     setAnnouncement("Interview ended. Your conversation and unsent text remain here for review.");
   }
 
-  function updateNote(id: number, change: Partial<Note>) {
-    setNotes((items) => items.map((item) => item.id === id ? { ...item, ...change } : item));
+  function updateClaim(kind: ClaimKind, id: string, text: string) {
+    setProfile((current) => {
+      if (kind === "skill") return { ...current, skills: current.skills.map((item) => item.id === id ? { ...item, name: text } : item) };
+      if (kind === "education") return { ...current, education: current.education.map((item) => item.id === id ? { ...item, text } : item) };
+      return { ...current, experience: current.experience.map((item) => item.id !== id ? item : "text" in item ? { ...item, text } : { ...item, role: text }) };
+    });
+  }
+
+  function confirmClaim(kind: ClaimKind, id: string) {
+    setProfile((current) => {
+      if (kind === "skill") return { ...current, skills: current.skills.map((item) => item.id === id ? { ...item, confirmed: true } : item) };
+      if (kind === "education") return { ...current, education: current.education.map((item) => item.id === id ? { ...item, confirmed: true } : item) };
+      return { ...current, experience: current.experience.map((item) => item.id === id ? { ...item, confirmed: true } : item) };
+    });
+    setAnnouncement("Suggestion confirmed and added to your profile.");
+  }
+
+  function removeClaim(kind: ClaimKind, id: string) {
+    setProfile((current) => ({
+      ...current,
+      ...(kind === "skill" ? { skills: current.skills.filter((item) => item.id !== id) } : {}),
+      ...(kind === "experience" ? { experience: current.experience.filter((item) => item.id !== id) } : {}),
+      ...(kind === "education" ? { education: current.education.filter((item) => item.id !== id) } : {}),
+    }));
+  }
+
+  function setPreference(name: keyof CandidateProfile["preferences"], checked: boolean) {
+    setProfile((current) => ({ ...current, preferences: { ...current.preferences, [name]: checked } }));
   }
 
   function addSkill(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = skillDraft.trim();
     if (!text) return;
-    setNotes((items) => [...items, { id: Date.now(), text, status: "confirmed" }]);
+    setProfile((current) => ({ ...current, skills: [...current.skills, { id: crypto.randomUUID(), name: text, evidence: "Added by you", confirmed: true }] }));
     setSkillDraft("");
     setAnnouncement(`${text} added to your confirmed experience.`);
   }
@@ -113,8 +169,9 @@ export default function Home() {
   function generateDraft() {
     const evidence = confirmed.map((item) => `• ${item.text}`).join("\n");
     const confirmedSection = confirmed.length ? `\n\nCONFIRMED EXPERIENCE & STRENGTHS\n${evidence}` : "\n\nNo experience details have been confirmed yet. Add or confirm details in your career canvas to include them here.";
-    setCv(`${candidateName}\n\nAPPLICATION PROFILE${confirmedSection}`);
-    setLetter(`Kia ora ${selected.company} team,\n\nI’m interested in the ${selected.title} role.${confirmed.length ? ` Details I’ve confirmed about my experience include: ${confirmed.map((item) => item.text).join("; ")}.` : " I’m preparing my application and will add my relevant experience after reviewing my career canvas."}\n\nThank you for considering my application.\n\nNgā mihi,\n${candidateName}`);
+    const name = profile.name ?? "";
+    setCv(`${name}\n\nAPPLICATION PROFILE${confirmedSection}`);
+    setLetter(`Kia ora ${selected.company} team,\n\nI’m interested in the ${selected.title} role.${confirmed.length ? ` Details I’ve confirmed about my experience include: ${confirmed.map((item) => item.text).join("; ")}.` : " I’m preparing my application and will add my relevant experience after reviewing my career canvas."}\n\nThank you for considering my application.\n\nNgā mihi,\n${name}`);
     setAnnouncement("A demo draft is ready. It uses confirmed details and is yours to edit.");
   }
 
@@ -132,11 +189,11 @@ export default function Home() {
   function reset() {
     activeRequest.current?.abort(); activeRequest.current = null;
     setPending(false); setError(""); setFailedRequest(null); setCorrectionId(null); setInterview(EMPTY_INTERVIEW);
-    setStep("welcome"); setChat([]); setCandidateName(""); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setMobilePanel("conversation"); setNotes([]); setCv(""); setLetter(""); setAnnouncement("Your session has been reset.");
+    setStep("welcome"); setChat([]); setProfile(emptyProfile()); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setMobilePanel("conversation"); setCv(""); setLetter(""); setAnnouncement("Your session has been reset.");
   }
 
   return (
-    <main className={`app${largeText ? " large-text" : ""}${highContrast ? " high-contrast" : ""}${reducedMotion ? " reduced-motion" : ""}`}>
+    <main className={`app${profile.preferences.largeText ? " large-text" : ""}${profile.preferences.highContrast ? " high-contrast" : ""}${profile.preferences.reducedMotion ? " reduced-motion" : ""}`}>
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <header className="topbar" id="top">
         <a className="brand" href="#top" aria-label="Access home"><Mark /><span>access</span></a>
@@ -146,9 +203,9 @@ export default function Home() {
           <details className="preferences">
             <summary aria-label="Display preferences"><span className="settings-glyph" aria-hidden="true">Aa</span><span className="pref-label">Display</span></summary>
             <div className="pref-menu">
-              <label><input type="checkbox" checked={largeText} onChange={(event) => setLargeText(event.target.checked)} /> Larger text</label>
-              <label><input type="checkbox" checked={highContrast} onChange={(event) => setHighContrast(event.target.checked)} /> Higher contrast</label>
-              <label><input type="checkbox" checked={reducedMotion} onChange={(event) => setReducedMotion(event.target.checked)} /> Reduce motion</label>
+              <label><input type="checkbox" checked={profile.preferences.largeText} onChange={(event) => setPreference("largeText", event.target.checked)} /> Larger text</label>
+              <label><input type="checkbox" checked={profile.preferences.highContrast} onChange={(event) => setPreference("highContrast", event.target.checked)} /> Higher contrast</label>
+              <label><input type="checkbox" checked={profile.preferences.reducedMotion} onChange={(event) => setPreference("reducedMotion", event.target.checked)} /> Reduce motion</label>
               <p>These preferences apply to this page only.</p>
             </div>
           </details>
@@ -185,12 +242,12 @@ export default function Home() {
 
         {step === "story" && <section className="workspace" aria-labelledby="story-heading">
           <div className="workspace-heading"><div><p className="eyebrow"><span className="eyebrow-line" /> YOUR STORY</p><h1 id="story-heading">Let’s start with what you know.</h1><p>Write the way you’d tell a friend. We’ll help you find the words for your experience.</p></div><span className="demo-tag"><span /> Gemini interview</span></div>
-          <div className="mobile-switch" role="group" aria-label="Workspace panel"><button aria-pressed={mobilePanel === "conversation"} onClick={() => setMobilePanel("conversation")}>Conversation</button><button aria-pressed={mobilePanel === "canvas"} onClick={() => setMobilePanel("canvas")}>Career canvas <span className="count-pill">{notes.length}</span></button></div>
+          <div className="mobile-switch" role="group" aria-label="Workspace panel"><button aria-pressed={mobilePanel === "conversation"} onClick={() => setMobilePanel("conversation")}>Conversation</button><button aria-pressed={mobilePanel === "canvas"} onClick={() => setMobilePanel("canvas")}>Career canvas <span className="count-pill">{claims.length}</span></button></div>
           <div className="workspace-grid">
             <section className={`conversation-pane${mobilePanel === "canvas" ? " mobile-hidden" : ""}`} aria-labelledby="conversation-heading">
               <div className="pane-heading"><div><span className="pane-index">A</span><h2 id="conversation-heading">In your words</h2></div><span className="small-label">AI CONVERSATION</span></div>
               <div ref={chatLog} className="chat-log" role="region" tabIndex={0} aria-label="Conversation history" aria-busy={pending}>
-                {chat.map((line) => <div key={line.id} className={`chat-line ${line.role === "user" ? "you" : "access"}`}><div className="avatar" aria-hidden="true">{line.role === "user" ? (candidateName[0] || "Y") : <Mark small />}</div><div><span className="speaker">{line.role === "user" ? "You" : "Access · Gemini"}</span><p>{line.content}</p>{line.role === "user" && line.content !== "[Question skipped by candidate]" && <button className="text-button" disabled={pending || interview.status === "ended"} onClick={() => { setCorrectionId(line.id); setMessage(line.content); setError(""); setFailedRequest(null); messageInput.current?.focus(); }}>Correct this answer</button>}</div></div>)}
+                {chat.map((line) => <div key={line.id} className={`chat-line ${line.role === "user" ? "you" : "access"}`}><div className="avatar" aria-hidden="true">{line.role === "user" ? (profile.name?.[0] || "Y") : <Mark small />}</div><div><span className="speaker">{line.role === "user" ? "You" : "Access · Gemini"}</span><p>{line.content}</p>{line.role === "user" && line.content !== "[Question skipped by candidate]" && <button className="text-button" disabled={pending || interview.status === "ended"} onClick={() => { setCorrectionId(line.id); setMessage(line.content); setError(""); setFailedRequest(null); messageInput.current?.focus(); }}>Correct this answer</button>}</div></div>)}
               </div>
               <p className="interview-status" role="status">{pending ? "Access is preparing a question…" : interview.status === "ended" ? "Interview ended. Your history is available above." : chat.length ? `Question ${interview.questions} of up to ${interview.limit} · ${interview.answered} answered` : "Start the interview to receive your first question."}</p>
               {error && <div className="interview-error"><p id="interview-error" role="alert">{error}</p><button className="button button-dark" disabled={pending || !failedRequest} onClick={() => failedRequest && void requestTurn(failedRequest)}>Retry</button></div>}
@@ -204,15 +261,14 @@ export default function Home() {
 
             <section className={`canvas-pane${mobilePanel === "conversation" ? " mobile-hidden" : ""}`} aria-labelledby="canvas-heading">
               <div className="pane-heading canvas-title"><div><span className="pane-index">B</span><div><h2 id="canvas-heading">Career canvas</h2><p>A living draft of what you bring.</p></div></div><span className="canvas-glyph" aria-hidden="true">✳</span></div>
-              <div className="candidate-line"><span className="candidate-avatar" aria-hidden="true">{candidateName.slice(0, 1).toUpperCase()}</span><span><label className="sr-only" htmlFor="candidate-name">Candidate name</label><input className="candidate-name" id="candidate-name" placeholder="Your name" value={candidateName} onChange={(event) => setCandidateName(event.target.value)} /><small>Your name · optional</small></span><span className="edit-name">Editable</span></div>
-              <div className="section-label"><span>EXPERIENCE & STRENGTHS</span><span>{confirmed.length} confirmed</span></div>
+              <div className="candidate-line"><span className="candidate-avatar" aria-hidden="true">{profile.name?.slice(0, 1).toUpperCase()}</span><span><label className="sr-only" htmlFor="candidate-name">Candidate name</label><input className="candidate-name" id="candidate-name" placeholder="Your name" value={profile.name ?? ""} onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))} /><small>Your name · optional</small></span><span className="edit-name">Editable</span></div>
+              <div className="section-label"><span>PROFILE SUGGESTIONS</span><span>{confirmed.length} confirmed · {claims.length - confirmed.length} to review</span></div>
               <ul className="note-list">
-                {!notes.length && <li>Add the skills and experience you want to keep below.</li>}
-                {notes.map((note) => <li key={note.id} className={`note-item ${note.status}`}>
-                  <span className="note-status" aria-label={note.status === "confirmed" ? "Confirmed" : "Needs your review"}>{note.status === "confirmed" ? "✓" : "· · ·"}</span>
-                  <label className="sr-only" htmlFor={`note-${note.id}`}>{note.status === "confirmed" ? "Confirmed experience" : "Suggested experience"}</label>
-                  <input id={`note-${note.id}`} value={note.text} onChange={(event) => updateNote(note.id, { text: event.target.value })} />
-                  {note.status === "pending" ? <div className="note-actions"><button className="icon-action accept" onClick={() => { updateNote(note.id, { status: "confirmed" }); setAnnouncement("Suggestion confirmed and added to your profile."); }}>Confirm</button><button className="icon-action" onClick={() => setNotes((items) => items.filter((item) => item.id !== note.id))}>Remove</button></div> : <span className="confirmed-label">YOURS</span>}
+                {!claims.length && <li>Add something yourself or continue your interview to see grounded suggestions here.</li>}
+                {claims.map((claim) => <li key={`${claim.kind}-${claim.id}`} className={`note-item ${claim.confirmed ? "confirmed" : "pending"}`}>
+                  <span className="note-status" aria-label={claim.confirmed ? "Confirmed" : "Needs your review"}>{claim.confirmed ? "✓" : "· · ·"}</span>
+                  <div className="claim-content"><span className="claim-kind">{claim.kind}</span><label className="sr-only" htmlFor={`note-${claim.id}`}>{claim.confirmed ? "Confirmed" : "Suggested"} {claim.kind}</label><input id={`note-${claim.id}`} value={claim.text} onChange={(event) => updateClaim(claim.kind, claim.id, event.target.value)} /><p className="claim-evidence"><strong>From your answer:</strong> “{claim.evidence}”</p></div>
+                  {!claim.confirmed ? <div className="note-actions"><button className="icon-action accept" onClick={() => confirmClaim(claim.kind, claim.id)}>Approve</button><button className="icon-action" onClick={() => removeClaim(claim.kind, claim.id)}>Remove</button></div> : <span className="confirmed-label">YOURS</span>}
                 </li>)}
               </ul>
               <form className="add-skill" onSubmit={addSkill}><label htmlFor="skill">Add something yourself</label><div><input id="skill" value={skillDraft} onChange={(event) => setSkillDraft(event.target.value)} placeholder="A skill or experience" /><button className="add-button" disabled={!skillDraft.trim()} aria-label="Add confirmed experience">+</button></div></form>

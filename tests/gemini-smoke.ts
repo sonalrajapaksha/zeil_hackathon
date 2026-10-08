@@ -19,10 +19,13 @@ async function turn(body: unknown) {
 }
 const start = await turn({ action: 'start', history: [] });
 console.log(`PASS initial Gemini question: ${start.reply}`);
-const follow = await turn({ action: 'answer', history: start.history, answer: 'I volunteer at a community library on Saturdays. I help visitors find books and keep the children’s area organised.' });
+const example = 'I volunteer at a community library on Saturdays. I help visitors find books and keep the children’s area organised.';
+const follow = await turn({ action: 'answer', history: start.history, answer: example });
 assert.equal(follow.history.length, 3);
 assert.match(follow.reply, /librar|book|visitor|children|organi|volunteer/i);
+assert.ok(follow.suggestions.every((suggestion) => example.toLocaleLowerCase().includes(suggestion.evidence.toLocaleLowerCase())));
 console.log(`PASS contextual Gemini follow-up: ${follow.reply}`);
+console.log(`PASS grounded profile proposals: ${JSON.stringify(follow.suggestions)}`);
 const end = await turn({ action: 'end', history: follow.history });
 assert.equal(end.interview.status, 'ended');
 console.log('PASS real interview start → answer → contextual follow-up → end; history retained.');

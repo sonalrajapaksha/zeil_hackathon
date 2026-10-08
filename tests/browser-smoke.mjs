@@ -20,7 +20,12 @@ globalThis.fetch = async (_url, init) => {
   const body = JSON.parse(init.body);
   const text = body.contents.at(-1).parts[0].text;
   const reply = body.contents.length === 1 ? 'What experience would you like to share?' : `Thinking about ${text.slice(0, 70)}, what did you learn in example ${calls}?`;
-  return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ reply }) }] }, finishReason: 'STOP' }] }));
+  const suggestions = text === 'I volunteer at a library.'
+    ? [{ kind: 'skill', text: 'Library volunteering', evidence: 'volunteer at a library' }]
+    : text === 'I helped organise donations.'
+      ? [{ kind: 'experience', text: 'Organising donations', evidence: 'organise donations' }]
+      : [];
+  return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ reply, suggestions }) }] }, finishReason: 'STOP' }] }));
 };
 try {
   for (const width of [1280, 320]) {
@@ -55,6 +60,13 @@ try {
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await page.getByText(/Question 2 of up to/).waitFor();
     assert.equal(await page.locator('.chat-line').count(), 3);
+    if (width === 320) await page.getByRole('button', { name: /Career canvas/ }).click();
+    assert.equal(await page.getByLabel('Suggested skill').inputValue(), 'Library volunteering');
+    await page.getByText('“volunteer at a library”').waitFor();
+    await page.getByLabel('Suggested skill').fill('Visitor support');
+    await page.getByRole('button', { name: 'Approve' }).click();
+    assert.equal(await page.getByLabel('Confirmed skill').inputValue(), 'Visitor support');
+    if (width === 320) await page.getByRole('button', { name: 'Conversation', exact: true }).click();
     await page.getByRole('button', { name: 'Correct this answer' }).click();
     await page.getByLabel('Correct your answer').fill('I volunteer at a food bank.');
     await page.getByRole('button', { name: 'Save correction' }).click();
@@ -75,6 +87,7 @@ try {
     assert.equal(await page.getByLabel('Add to your story').getAttribute('readonly'), '');
     release(); release = undefined;
     await page.getByText(/Question 4 of up to/).waitFor();
+    assert.equal(await page.getByLabel('Suggested experience').inputValue(), 'Organising donations');
     await page.getByRole('button', { name: 'End interview', exact: true }).click();
     await page.getByText('Interview ended. Your history is available above.').waitFor();
     assert.equal(await page.getByRole('button', { name: 'Send answer' }).isDisabled(), true);
@@ -82,11 +95,13 @@ try {
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'No horizontal overflow');
     // Preserve Task 01 canvas, preferences, fictional roles and draft controls.
     if (width === 320) await page.getByRole('button', { name: /Career canvas/ }).click();
-    await page.getByLabel('Add something yourself').fill('Organising donations');
+    await page.getByLabel('Add something yourself').fill('Event planning');
     await page.getByRole('button', { name: 'Add confirmed experience' }).click();
     await page.getByRole('button', { name: 'Choose a role' }).click();
     await page.getByRole('button', { name: 'Prepare a demo draft' }).click();
-    assert.match(await page.getByLabel('Curriculum vitae').inputValue(), /Organising donations/);
+    assert.match(await page.getByLabel('Curriculum vitae').inputValue(), /Visitor support/);
+    assert.doesNotMatch(await page.getByLabel('Curriculum vitae').inputValue(), /Organising donations/);
+    assert.match(await page.getByLabel('Curriculum vitae').inputValue(), /Event planning/, 'Candidate-added confirmed skill remains available');
     await page.getByRole('button', { name: 'Reset session' }).click();
     release = () => {};
     await page.getByRole('button', { name: 'Start your interview' }).click();

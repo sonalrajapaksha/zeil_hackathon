@@ -19,10 +19,10 @@ function request(body: unknown) {
 function sentThinking(init: RequestInit | undefined) {
   return JSON.parse(String(init?.body)).generationConfig.thinkingConfig?.thinkingBudget;
 }
-function fakeGemini(reply = 'What did you enjoy about helping library visitors?') {
+function fakeGemini(reply = 'What did you enjoy about helping library visitors?', suggestions: { kind: 'skill' | 'experience' | 'education'; text: string; evidence: string }[] = []) {
   process.env.GEMINI_API_KEY = 'test-secret';
   return mock.method(globalThis, 'fetch', async (_url: unknown, init: RequestInit) => new Response(JSON.stringify({
-    candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify({ reply }) }] }, finishReason: 'STOP' }],
+    candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify({ reply, suggestions }) }] }, finishReason: 'STOP' }],
   }), { headers: { 'Content-Type': 'application/json' } }));
 }
 
@@ -61,6 +61,20 @@ test('follow-up sends actual context and retains history in order', async () => 
   assert.deepEqual(sent.contents.map((item: {role:string}) => item.role), ['model', 'user']);
   assert.equal(sent.contents[1].parts[0].text, answer.content);
   assert.equal(sentThinking(sdk.mock.calls[0].arguments[1]), undefined);
+});
+
+test('profile suggestions carry exact answer evidence and unsupported evidence fails safely', async () => {
+  fakeGemini('What did you learn from volunteering?', [{ kind: 'skill', text: 'Library volunteering', evidence: 'volunteer at a library' }]);
+  const body = { action: 'answer', history: [question], answer: answer.content };
+  const accepted = ConversationResponseSchema.parse(await (await POST(request(body))).json());
+  assert.deepEqual(accepted.suggestions, [{ kind: 'skill', text: 'Library volunteering', evidence: 'volunteer at a library' }]);
+
+  mock.restoreAll();
+  process.env.GEMINI_API_KEY = 'test-secret';
+  mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ reply: 'What did you learn?', suggestions: [{ kind: 'skill', text: 'Leadership', evidence: 'managed a team' }] }) }] }, finishReason: 'STOP' }] })));
+  const rejected = await POST(request(body));
+  assert.equal(rejected.status, 502);
+  assert.equal((await rejected.json()).error.code, 'INVALID_RESPONSE');
 });
 
 test('skip is explicit; correction removes stale answers without mutating original history', async () => {

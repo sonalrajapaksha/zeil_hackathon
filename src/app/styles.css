@@ -22,3 +22,4 @@
 
 /* Keep the keyboard skip link hidden when reduced motion disables transforms. */
 .skip-link:not(:focus) { clip-path: inset(100%); }
+.claim-content{min-width:0}.claim-kind{display:block;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}.claim-evidence{margin:5px 0 0;color:#615d65;font-size:11px;line-height:1.5;overflow-wrap:anywhere}.claim-evidence strong{color:#393640}.note-actions{gap:12px}.icon-action{min-height:44px;font-size:12px;padding:5px 0}
