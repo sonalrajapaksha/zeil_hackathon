@@ -1,6 +1,7 @@
 // Optional browser QA: supply PLAYWRIGHT_MODULE if Playwright is in an external tool cache.
 import assert from 'node:assert/strict';
 import { POST } from '../src/app/api/conversation/route.ts';
+import { POST as applicationPOST } from '../src/app/api/application/route.ts';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const browser = await chromium.launch({
   headless: true,
@@ -18,6 +19,15 @@ globalThis.fetch = async (_url, init) => {
   if (release) await new Promise((resolve) => { release = resolve; });
   if (failNext) { failNext = false; throw new Error('mock provider failure'); }
   const body = JSON.parse(init.body);
+  if (body.generationConfig.responseJsonSchema?.properties?.cvText) {
+    const input = JSON.parse(body.contents[0].parts[0].text);
+    const details = input.evidence.map((item) => item.text);
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({
+      cvText: `CV for ${input.job.title}\n${details.join('\n')}`,
+      coverLetter: `Kia ora ${input.job.company} team, I am interested in the ${input.job.title} role. ${details.join('; ')}`,
+      unverifiedClaims: [],
+    }) }] }, finishReason: 'STOP' }] }));
+  }
   const text = body.contents.at(-1).parts[0].text;
   const previousQuestion = [...body.contents.slice(0, -1)].reverse().find((item) => item.role === 'model')?.parts[0].text;
   const clarification = text.includes('requests clarification');
@@ -39,12 +49,18 @@ try {
     assert.equal(await page.getByRole('link', { name: 'Skip to main content' }).evaluate((link) => link === document.activeElement), true);
     await page.keyboard.press('Tab');
     assert.equal(await page.getByRole('link', { name: 'Skip to main content' }).evaluate((link) => getComputedStyle(link).clipPath), 'inset(100%)');
-    // Verify the actual HTTP endpoint's missing-key error before mocking Gemini.
-    const real = await page.request.post(`${baseURL}/api/conversation`, { data: { action: 'start', history: [], questionStyle: 'standard' } });
-    assert.equal(real.status(), 503);
-    assert.equal((await real.json()).error.code, 'NOT_CONFIGURED');
+    // Verify the actual HTTP endpoint rejects malformed input before mocking Gemini.
+    const real = await page.request.post(`${baseURL}/api/conversation`, { data: { action: 'start', history: [], questionStyle: 'standard', extra: true } });
+    assert.equal(real.status(), 400);
+    assert.equal((await real.json()).error.code, 'INVALID_REQUEST');
     await page.route('**/api/conversation', async (route) => {
       const response = await POST(new Request('http://localhost/api/conversation', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: route.request().postData(),
+      }));
+      await route.fulfill({ status: response.status, contentType: 'application/json', body: await response.text() });
+    });
+    await page.route('**/api/application', async (route) => {
+      const response = await applicationPOST(new Request('http://localhost/api/application', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: route.request().postData(),
       }));
       await route.fulfill({ status: response.status, contentType: 'application/json', body: await response.text() });
@@ -109,10 +125,30 @@ try {
     await page.getByLabel('Add something yourself').fill('Event planning');
     await page.getByRole('button', { name: 'Add confirmed experience' }).click();
     await page.getByRole('button', { name: 'Choose a role' }).click();
-    await page.getByRole('button', { name: 'Prepare a demo draft' }).click();
+    await page.getByRole('button', { name: 'Prepare application draft' }).click();
+    await page.getByRole('textbox', { name: 'Curriculum vitae' }).waitFor();
     assert.match(await page.getByLabel('Curriculum vitae').inputValue(), /Visitor support/);
     assert.doesNotMatch(await page.getByLabel('Curriculum vitae').inputValue(), /Organising donations/);
     assert.match(await page.getByLabel('Curriculum vitae').inputValue(), /Event planning/, 'Candidate-added confirmed skill remains available');
+    await page.getByLabel('Curriculum vitae').fill('My reviewed CV edit.');
+    failNext = true;
+    await page.getByRole('button', { name: 'Prepare application draft' }).click();
+    await page.getByRole('alert').waitFor();
+    assert.equal(await page.getByLabel('Curriculum vitae').inputValue(), 'My reviewed CV edit.', 'A failed generation preserves candidate edits');
+    await page.getByRole('button', { name: 'Retry draft' }).click();
+    await page.getByLabel('Curriculum vitae').evaluate((element) => new Promise((resolve) => {
+      const check = () => element.value !== 'My reviewed CV edit.' ? resolve(true) : setTimeout(check, 10);
+      check();
+    }));
+    await page.getByRole('button', { name: /Junior Data Analyst/ }).click();
+    await page.getByText(/Current draft: Customer Support Assistant/).waitFor();
+    await page.getByRole('button', { name: 'Prepare application draft' }).click();
+    await page.getByLabel('Curriculum vitae').evaluate((element) => new Promise((resolve) => {
+      const check = () => element.value.includes('CV for Junior Data Analyst') ? resolve(true) : setTimeout(check, 10);
+      check();
+    }));
+    assert.match(await page.getByLabel('Cover letter').inputValue(), /Northstar Analytics/);
+    await page.screenshot({ path: `/tmp/access-task04-${width}.png`, fullPage: true });
     await page.getByRole('button', { name: 'Reset session' }).click();
     assert.equal(await page.getByRole('button', { name: 'Start your interview' }).isDisabled(), true);
     await page.getByRole('radio', { name: /Standard/ }).check();
@@ -123,7 +159,7 @@ try {
     release(); release = undefined;
     await page.getByRole('button', { name: 'Start your interview' }).waitFor();
     assert.deepEqual(errors, []);
-    console.log(`PASS ${width}px: keyboard start, real missing-key HTTP error, mocked contextual replies, failure/retry, correction, skip, duplicate protection, end, canvas/draft, reset, no overflow or runtime errors.`);
+    console.log(`PASS ${width}px: keyboard start, invalid-request HTTP rejection, contextual interview and application drafts, sensitive/approval filtering, generation error recovery, job switching, reset, no overflow or runtime errors.`);
     await page.close();
   }
 } finally {

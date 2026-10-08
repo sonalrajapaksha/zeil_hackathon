@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { DEMO_JOBS } from "@/lib/jobs";
-import { CLARIFICATION_REQUEST, ConversationErrorSchema, ConversationResponseSchema, type CandidateProfile, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
+import { ApplicationErrorSchema, ApplicationPackageSchema, CLARIFICATION_REQUEST, ConversationErrorSchema, ConversationResponseSchema, type ApplicationPackage, type CandidateProfile, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
 import { EMPTY_INTERVIEW, progress } from "@/lib/interview";
 
 type Step = "welcome" | "story" | "application";
@@ -42,6 +42,10 @@ export default function Home() {
   const [selectedJob, setSelectedJob] = useState(DEMO_JOBS[0].id);
   const [cv, setCv] = useState("");
   const [letter, setLetter] = useState("");
+  const [draftJobId, setDraftJobId] = useState<string | null>(null);
+  const [unverifiedClaims, setUnverifiedClaims] = useState<string[]>([]);
+  const [applicationPending, setApplicationPending] = useState(false);
+  const [applicationError, setApplicationError] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const selected = DEMO_JOBS.find((job) => job.id === selectedJob)!;
 
@@ -189,13 +193,32 @@ export default function Home() {
     setAnnouncement(`${text} added to your confirmed experience.`);
   }
 
-  function generateDraft() {
-    const evidence = confirmed.map((item) => `• ${item.text}`).join("\n");
-    const confirmedSection = confirmed.length ? `\n\nCONFIRMED EXPERIENCE & STRENGTHS\n${evidence}` : "\n\nNo experience details have been confirmed yet. Add or confirm details in your career canvas to include them here.";
-    const name = profile.name ?? "";
-    setCv(`${name}\n\nAPPLICATION PROFILE${confirmedSection}`);
-    setLetter(`Kia ora ${selected.company} team,\n\nI’m interested in the ${selected.title} role.${confirmed.length ? ` Details I’ve confirmed about my experience include: ${confirmed.map((item) => item.text).join("; ")}.` : " I’m preparing my application and will add my relevant experience after reviewing my career canvas."}\n\nThank you for considering my application.\n\nNgā mihi,\n${name}`);
-    setAnnouncement("A demo draft is ready. It uses confirmed details and is yours to edit.");
+  async function generateDraft() {
+    if (applicationPending) return;
+    setApplicationPending(true);
+    setApplicationError("");
+    setAnnouncement("Preparing an application from your confirmed work-related details.");
+    try {
+      const response = await fetch("/api/application", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile, jobId: selectedJob }),
+      });
+      const body: unknown = await response.json();
+      if (!response.ok) {
+        const failure = ApplicationErrorSchema.safeParse(body);
+        throw new Error(failure.success ? failure.data.error.message : "The application could not be prepared. Your current draft is unchanged. Please retry.");
+      }
+      const parsed = ApplicationPackageSchema.safeParse(body);
+      if (!parsed.success) throw new Error("The AI returned an unusable draft. Your current draft is unchanged. Please retry.");
+      const result: ApplicationPackage = parsed.data;
+      setCv(result.cvText); setLetter(result.coverLetter); setDraftJobId(result.jobId); setUnverifiedClaims(result.unverifiedClaims);
+      setAnnouncement("Your editable application draft is ready. Review and change every detail before using it.");
+    } catch (failure) {
+      const message = failure instanceof Error ? failure.message : "Could not reach the AI. Your current draft is unchanged. Please retry.";
+      setApplicationError(message); setAnnouncement(message);
+    } finally {
+      setApplicationPending(false);
+    }
   }
 
   function downloadDraft() {
@@ -212,7 +235,7 @@ export default function Home() {
   function reset() {
     activeRequest.current?.abort(); activeRequest.current = null;
     setPending(false); setError(""); setFailedRequest(null); setCorrectionId(null); setInterview(EMPTY_INTERVIEW);
-    setStep("welcome"); setChat([]); setProfile(emptyProfile()); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setMobilePanel("conversation"); setCv(""); setLetter(""); setAnnouncement("Your session has been reset.");
+    setStep("welcome"); setChat([]); setProfile(emptyProfile()); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setMobilePanel("conversation"); setCv(""); setLetter(""); setDraftJobId(null); setUnverifiedClaims([]); setApplicationError(""); setAnnouncement("Your session has been reset.");
   }
 
   return (
@@ -310,13 +333,13 @@ export default function Home() {
               <button className="button button-dark continue-button" onClick={() => { setStep("application"); setAnnouncement("Choose a fictional role to prepare your draft."); }}>Choose a role <span aria-hidden="true">→</span></button>
             </section>
           </div>
-          <p className="demo-disclaimer">Interview questions are generated by Gemini. Add your own canvas details; application drafts use a prepared demo format.</p>
+          <p className="demo-disclaimer">Interview questions and application drafts are generated by Gemini. Drafts use only confirmed work-related details that pass sensitive-information screening.</p>
         </section>}
 
         {step === "application" && <section className="application" aria-labelledby="application-heading">
           <div className="application-heading"><div><p className="eyebrow"><span className="eyebrow-line" /> YOUR NEXT STEP</p><h1 id="application-heading">A draft you can make your own.</h1><p>Choose a fictional role. We’ll shape a starting point from the details you’ve confirmed.</p></div><span className="demo-tag"><span /> Fictional roles</span></div>
-          <div className="job-layout"><section className="job-column" aria-labelledby="jobs-heading"><div className="section-title-row"><h2 id="jobs-heading">Choose a role</h2><span>3 sample listings</span></div><div className="job-list">{DEMO_JOBS.map((job, index) => <button key={job.id} className={`job-option${selectedJob === job.id ? " selected" : ""}`} aria-pressed={selectedJob === job.id} onClick={() => { setSelectedJob(job.id); setCv(""); setLetter(""); }}><span className={`job-symbol job-symbol-${index}`} aria-hidden="true">{["↗", "⌁", "＋"][index]}</span><span className="job-main"><strong>{job.title}</strong><span>{job.company} · {job.location}</span><small>{job.arrangement} <i>·</i> Fictional listing</small></span><span className="job-radio" aria-hidden="true">{selectedJob === job.id ? "✓" : ""}</span></button>)}</div><div className="job-description"><span className="small-label">ROLE SNAPSHOT</span><h3>{selected.title}</h3><p>{selected.description}</p><ul>{selected.requirements.map((requirement) => <li key={requirement}>{requirement}</li>)}</ul></div><button className="button button-primary generate-button" onClick={generateDraft}>Prepare a demo draft <span aria-hidden="true">↗</span></button><p className="no-submit"><span aria-hidden="true">◎</span> This only prepares a draft. It never applies or contacts an employer.</p></section>
-            <section className="draft-column" aria-labelledby="draft-heading"><div className="draft-header"><div><span className="pane-index">C</span><div><h2 id="draft-heading">Your application draft</h2><p>{cv ? "Ready for your review · demo content" : "Your preview will appear here"}</p></div></div>{cv && <span className="draft-status"><i /> EDITABLE</span>}</div>{cv ? <><div className="draft-editors"><div className="editor-block"><label htmlFor="cv-text">Curriculum vitae</label><textarea id="cv-text" value={cv} onChange={(event) => setCv(event.target.value)} rows={13} /></div><div className="editor-block"><label htmlFor="letter-text">Cover letter</label><textarea id="letter-text" value={letter} onChange={(event) => setLetter(event.target.value)} rows={12} /></div></div><div className="draft-actions"><p>Made from confirmed details. Read it through and change anything you like.</p><button className="button button-dark" onClick={downloadDraft}>Download .txt <span aria-hidden="true">↓</span></button></div></> : <div className="empty-draft"><div className="empty-mark" aria-hidden="true"><span>✳</span><i /><b /></div><h3>Your story will come through here.</h3><p>When you’re ready, prepare a demo draft. You can edit every word before you download it.</p><span className="empty-rule" /></div>}</section></div>
+          <div className="job-layout"><section className="job-column" aria-labelledby="jobs-heading"><div className="section-title-row"><h2 id="jobs-heading">Choose a role</h2><span>3 sample listings</span></div><div className="job-list">{DEMO_JOBS.map((job, index) => <button key={job.id} className={`job-option${selectedJob === job.id ? " selected" : ""}`} aria-pressed={selectedJob === job.id} onClick={() => { setSelectedJob(job.id); setApplicationError(""); }}><span className={`job-symbol job-symbol-${index}`} aria-hidden="true">{["↗", "⌁", "＋"][index]}</span><span className="job-main"><strong>{job.title}</strong><span>{job.company} · {job.location}</span><small>{job.arrangement} <i>·</i> Fictional listing</small></span><span className="job-radio" aria-hidden="true">{selectedJob === job.id ? "✓" : ""}</span></button>)}</div><div className="job-description"><span className="small-label">ROLE SNAPSHOT</span><h3>{selected.title}</h3><p>{selected.description}</p><ul>{selected.requirements.map((requirement) => <li key={requirement}>{requirement}</li>)}</ul></div><button className="button button-primary generate-button" onClick={generateDraft} disabled={applicationPending}>{applicationPending ? "Preparing your draft…" : "Prepare application draft"} <span aria-hidden="true">↗</span></button><p className="no-submit"><span aria-hidden="true">◎</span> This only prepares a draft. It never applies or contacts an employer.</p>{applicationError && <div className="application-error" role="alert"><p>{applicationError}</p><button className="text-button" onClick={generateDraft} disabled={applicationPending}>Retry draft</button></div>}</section>
+            <section className="draft-column" aria-labelledby="draft-heading" aria-busy={applicationPending}><div className="draft-header"><div><span className="pane-index">C</span><div><h2 id="draft-heading">Your application draft</h2><p>{cv ? draftJobId === selectedJob ? "Ready for your review" : `Current draft: ${DEMO_JOBS.find((job) => job.id === draftJobId)?.title ?? "previous role"}` : "Your preview will appear here"}</p></div></div>{cv && <span className="draft-status"><i /> EDITABLE</span>}</div>{applicationPending && <p className="application-progress" role="status">Preparing your draft. Your existing text stays available while this runs.</p>}{cv ? <><div className="draft-editors"><div className="editor-block"><label htmlFor="cv-text">Curriculum vitae</label><textarea id="cv-text" value={cv} onChange={(event) => setCv(event.target.value)} rows={13} /></div><div className="editor-block"><label htmlFor="letter-text">Cover letter</label><textarea id="letter-text" value={letter} onChange={(event) => setLetter(event.target.value)} rows={12} /></div></div>{unverifiedClaims.length > 0 && <aside className="unverified-note" aria-labelledby="unverified-heading"><h3 id="unverified-heading">Details to check</h3><p>These details were uncertain, so Access left them out of your draft:</p><ul>{unverifiedClaims.map((claim, index) => <li key={`${index}-${claim}`}>{claim}</li>)}</ul></aside>}<div className="draft-actions"><p>Made from confirmed, work-related details. Read it through and change anything you like.</p><button className="button button-dark" onClick={downloadDraft}>Download .txt <span aria-hidden="true">↓</span></button></div></> : <div className="empty-draft"><div className="empty-mark" aria-hidden="true"><span>✳</span><i /><b /></div><h3>Your story will come through here.</h3><p>Prepare an application draft from the work-related details you have confirmed. You can edit every word before you download it.</p><span className="empty-rule" /></div>}</section></div>
           <button className="back-link" onClick={() => setStep("story")}>← Back to your story</button>
         </section>}
       </div>

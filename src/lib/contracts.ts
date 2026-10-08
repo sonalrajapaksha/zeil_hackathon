@@ -6,7 +6,20 @@ export const ProfileEducationSchema = z.object({ id:z.string(), text:z.string(),
 export const CandidateProfileSchema = z.object({ name:z.string().optional(), summary:z.string().optional(), skills:z.array(ProfileSkillSchema), experience:z.array(z.union([ExperienceSchema, ProfileExperienceSchema])), education:z.array(ProfileEducationSchema), preferences:z.object({largeText:z.boolean(), highContrast:z.boolean(), reducedMotion:z.boolean(), questionStyle:z.enum(['simple','standard']).optional()}) });
 export const JobListingSchema = z.object({id:z.string(),title:z.string(),company:z.string(),location:z.string(),arrangement:z.string(),description:z.string(),requirements:z.array(z.string())});
 export const ConversationMessageSchema = z.object({id:z.string(),role:z.enum(['user','assistant']),content:z.string()});
-export const ApplicationPackageSchema = z.object({jobId:z.string(),cvText:z.string(),coverLetter:z.string(),unverifiedClaims:z.array(z.string()),generatedAt:z.string()});
+export const ApplicationPackageSchema = z.object({jobId:z.string().min(1).max(100),cvText:z.string().trim().min(1).max(12_000),coverLetter:z.string().trim().min(1).max(8_000),unverifiedClaims:z.array(z.string().trim().min(1).max(300)).max(10),generatedAt:z.string().datetime()}).strict();
+export const ApplicationRequestSchema = z.object({ profile: CandidateProfileSchema, jobId: z.string().min(1).max(100) }).strict().superRefine(({ profile }, ctx) => {
+  const claims = [...profile.skills, ...profile.experience, ...profile.education];
+  if (claims.length > 60) ctx.addIssue({ code: 'custom', message: 'Too many profile items.' });
+  if (claims.some((claim) => ("name" in claim ? claim.name.length : "text" in claim ? claim.text.length : claim.role.length + claim.organisation.length) > 500))
+    ctx.addIssue({ code: 'custom', message: 'Profile items must be 500 characters or fewer.' });
+});
+export const ApplicationErrorSchema = z.object({
+  error: z.object({
+    code: z.enum(['INVALID_REQUEST', 'NOT_CONFIGURED', 'UNKNOWN_JOB', 'NO_CONFIRMED_EVIDENCE', 'TIMEOUT', 'RATE_LIMITED', 'PROVIDER_ERROR', 'INVALID_RESPONSE']),
+    message: z.string(), retryable: z.boolean(),
+  }).strict(),
+}).strict();
+export type ApplicationRequest = z.infer<typeof ApplicationRequestSchema>;
 export type CandidateProfile = z.infer<typeof CandidateProfileSchema>;
 export type JobListing = z.infer<typeof JobListingSchema>;
 export type ConversationMessage = z.infer<typeof ConversationMessageSchema>;
