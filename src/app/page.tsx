@@ -198,6 +198,16 @@ export default function Home() {
     setProfile((current) => ({ ...current, preferences: { ...current.preferences, questionStyle } }));
   }
 
+  function navigateTo(nextStep: Step) {
+    if (nextStep === "story") {
+      begin();
+      if (chat.length) setAnnouncement("Your story and career canvas are ready.");
+      return;
+    }
+    setStep(nextStep);
+    setAnnouncement(nextStep === "welcome" ? "Welcome. Choose how you want questions and display to work." : "Choose a fictional role and review your application draft.");
+  }
+
   function clarifyQuestion() {
     const questionStyle = profile.preferences.questionStyle;
     if (!questionStyle || pending || !chat.length || chat.at(-1)?.role !== "assistant" || chat.at(-2)?.content === CLARIFICATION_REQUEST) return;
@@ -289,7 +299,7 @@ export default function Home() {
 
       <nav className="journey" aria-label="Your progress">
         {[{ id: "welcome", name: "Start" }, { id: "story", name: "Your story" }, { id: "application", name: "Your draft" }].map((item, index) => (
-          <button key={item.id} className={`journey-step${step === item.id ? " is-current" : ""}${(step === "application" || step === "story" && index === 0) && index < ["welcome", "story", "application"].indexOf(step) ? " is-done" : ""}`} onClick={() => item.id === "welcome" ? setStep("welcome") : item.id === "story" ? begin() : setStep("application")} aria-current={step === item.id ? "step" : undefined}>
+          <button key={item.id} className={`journey-step${step === item.id ? " is-current" : ""}${(step === "application" || step === "story" && index === 0) && index < ["welcome", "story", "application"].indexOf(step) ? " is-done" : ""}`} onClick={() => navigateTo(item.id as Step)} aria-current={step === item.id ? "step" : undefined}>
             <span className="step-dot" aria-hidden="true">{index + 1}</span><span>{item.name}</span>
           </button>
         ))}
