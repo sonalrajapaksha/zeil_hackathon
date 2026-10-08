@@ -1,17 +1,12 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { DEMO_JOBS } from "@/lib/jobs";
+import { ConversationErrorSchema, ConversationResponseSchema, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
+import { EMPTY_INTERVIEW, progress } from "@/lib/interview";
 
 type Step = "welcome" | "story" | "application";
 type Note = { id: number; text: string; status: "pending" | "confirmed" };
-type ChatLine = { from: "you" | "access"; text: string };
-
-const initialChat: ChatLine[] = [
-  { from: "you", text: "I volunteer at the Glenfield community library on Saturdays. I help visitors find books and keep the children's area organised." },
-  { from: "access", text: "That sounds like a lot of thoughtful, practical work. What do you enjoy most about helping visitors?" },
-];
-
 function Mark({ small = false }: { small?: boolean }) {
   return <span className={`mark${small ? " mark-small" : ""}`} aria-hidden="true"><span /><span /><span /></span>;
 }
@@ -22,15 +17,22 @@ export default function Home() {
   const [highContrast, setHighContrast] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"conversation" | "canvas">("conversation");
-  const [chat, setChat] = useState(initialChat);
+  const [chat, setChat] = useState<ConversationMessage[]>([]);
+  const [interview, setInterview] = useState(EMPTY_INTERVIEW);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const [failedRequest, setFailedRequest] = useState<ConversationRequest | null>(null);
+  const [correctionId, setCorrectionId] = useState<string | null>(null);
+  const activeRequest = useRef<AbortController | null>(null);
+  const messageInput = useRef<HTMLTextAreaElement>(null);
+  const chatLog = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (chatLog.current) chatLog.current.scrollTop = chatLog.current.scrollHeight;
+  }, [chat]);
   const [message, setMessage] = useState("");
-  const [notes, setNotes] = useState<Note[]>([
-    { id: 1, text: "Volunteering at Glenfield Community Library on Saturdays", status: "pending" },
-    { id: 2, text: "Welcoming visitors and helping them find what they need", status: "pending" },
-    { id: 3, text: "Keeping a shared space organised", status: "pending" },
-  ]);
+  const [notes, setNotes] = useState<Note[]>([]);
   const [skillDraft, setSkillDraft] = useState("");
-  const [candidateName, setCandidateName] = useState("Maya Chen");
+  const [candidateName, setCandidateName] = useState("");
   const [selectedJob, setSelectedJob] = useState(DEMO_JOBS[0].id);
   const [cv, setCv] = useState("");
   const [letter, setLetter] = useState("");
@@ -38,19 +40,61 @@ export default function Home() {
   const selected = DEMO_JOBS.find((job) => job.id === selectedJob)!;
   const confirmed = useMemo(() => notes.filter((note) => note.status === "confirmed"), [notes]);
 
+  async function requestTurn(request: ConversationRequest) {
+    if (activeRequest.current) return;
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    setPending(true); setError(""); setFailedRequest(null);
+    setAnnouncement("Access is preparing a question.");
+    const timeout = setTimeout(() => controller.abort(), 35_000);
+    try {
+      const response = await fetch("/api/conversation", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request), signal: controller.signal,
+      });
+      const body: unknown = await response.json();
+      if (!response.ok) {
+        const failure = ConversationErrorSchema.safeParse(body);
+        throw new Error(failure.success ? failure.data.error.message : "The interview could not continue. Please retry.");
+      }
+      const parsed = ConversationResponseSchema.safeParse(body);
+      if (!parsed.success) throw new Error("The AI returned an unusable response. Your story is unchanged. Please retry.");
+      const result = parsed.data;
+      if (activeRequest.current !== controller) return;
+      setChat(result.history); setInterview(result.interview);
+      setMessage(""); setCorrectionId(null);
+      setAnnouncement(result.interview.status === "ended" ? "Interview ended. Your history is available for review." : "A new AI question is ready.");
+      messageInput.current?.focus();
+    } catch (failure) {
+      if (activeRequest.current !== controller) return;
+      const text = controller.signal.aborted ? "The request took too long. Your story and answer are saved here. Please retry." : failure instanceof Error ? failure.message : "Could not reach the AI. Please retry.";
+      setError(text); setFailedRequest(request); setAnnouncement(text);
+    } finally {
+      clearTimeout(timeout);
+      if (activeRequest.current === controller) {
+        activeRequest.current = null; setPending(false);
+      }
+    }
+  }
+
   function begin() {
     setStep("story");
-    setAnnouncement("Your story workspace is ready. Three ideas from the sample story need your review.");
+    if (!chat.length && !activeRequest.current) void requestTurn({ action: "start", history: [] });
   }
 
   function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const value = message.trim();
-    if (!value) return;
-    setChat((lines) => [...lines, { from: "you", text: value }, { from: "access", text: "Thanks for sharing that. I’ve noted a possible strength below. Please review it and change anything that doesn’t sound like you." }]);
-    setNotes((items) => items.some((item) => item.text.toLowerCase().includes("communicating with visitors")) ? items : [...items, { id: Date.now(), text: "Communicating with visitors in a helpful way", status: "pending" }]);
-    setMessage("");
-    setAnnouncement("Demo response added. A new suggestion is ready for review.");
+    if (!message.trim() || pending || interview.status === "ended") return;
+    void requestTurn(correctionId
+      ? { action: "correct", history: chat, messageId: correctionId, answer: message.trim() }
+      : { action: "answer", history: chat, answer: message.trim() });
+  }
+
+  function endInterview() {
+    activeRequest.current?.abort(); activeRequest.current = null;
+    setPending(false); setError(""); setFailedRequest(null); setCorrectionId(null);
+    setInterview(progress(chat, true));
+    setAnnouncement("Interview ended. Your conversation and unsent text remain here for review.");
   }
 
   function updateNote(id: number, change: Partial<Note>) {
@@ -79,18 +123,16 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "maya-chen-application-draft.txt";
+    link.download = "access-application-draft.txt";
     link.click();
     URL.revokeObjectURL(url);
     setAnnouncement("Your application draft has been downloaded.");
   }
 
   function reset() {
-    setStep("welcome"); setChat(initialChat); setCandidateName("Maya Chen"); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setMobilePanel("conversation"); setNotes([
-      { id: 1, text: "Volunteering at Glenfield Community Library on Saturdays", status: "pending" },
-      { id: 2, text: "Welcoming visitors and helping them find what they need", status: "pending" },
-      { id: 3, text: "Keeping a shared space organised", status: "pending" },
-    ]); setCv(""); setLetter(""); setAnnouncement("Your demo session has been reset.");
+    activeRequest.current?.abort(); activeRequest.current = null;
+    setPending(false); setError(""); setFailedRequest(null); setCorrectionId(null); setInterview(EMPTY_INTERVIEW);
+    setStep("welcome"); setChat([]); setCandidateName(""); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setMobilePanel("conversation"); setNotes([]); setCv(""); setLetter(""); setAnnouncement("Your session has been reset.");
   }
 
   return (
@@ -100,7 +142,7 @@ export default function Home() {
         <a className="brand" href="#top" aria-label="Access home"><Mark /><span>access</span></a>
         <p className="top-note">A little more room to tell your story.</p>
         <div className="top-actions">
-          {step !== "welcome" && <button className="text-button reset-button" onClick={reset}>Reset demo</button>}
+          {step !== "welcome" && <button className="text-button reset-button" onClick={reset}>Reset session</button>}
           <details className="preferences">
             <summary aria-label="Display preferences"><span className="settings-glyph" aria-hidden="true">Aa</span><span className="pref-label">Display</span></summary>
             <div className="pref-menu">
@@ -115,7 +157,7 @@ export default function Home() {
 
       <nav className="journey" aria-label="Your progress">
         {[{ id: "welcome", name: "Start" }, { id: "story", name: "Your story" }, { id: "application", name: "Your draft" }].map((item, index) => (
-          <button key={item.id} className={`journey-step${step === item.id ? " is-current" : ""}${(step === "application" || step === "story" && index === 0) && index < ["welcome", "story", "application"].indexOf(step) ? " is-done" : ""}`} onClick={() => item.id === "welcome" ? setStep("welcome") : item.id === "story" ? setStep("story") : setStep("application")} aria-current={step === item.id ? "step" : undefined}>
+          <button key={item.id} className={`journey-step${step === item.id ? " is-current" : ""}${(step === "application" || step === "story" && index === 0) && index < ["welcome", "story", "application"].indexOf(step) ? " is-done" : ""}`} onClick={() => item.id === "welcome" ? setStep("welcome") : item.id === "story" ? begin() : setStep("application")} aria-current={step === item.id ? "step" : undefined}>
             <span className="step-dot" aria-hidden="true">{index + 1}</span><span>{item.name}</span>
           </button>
         ))}
@@ -127,8 +169,8 @@ export default function Home() {
             <p className="eyebrow"><span className="eyebrow-line" /> YOUR NEXT CHAPTER, ON YOUR TERMS</p>
             <h1 id="welcome-heading">Your experience<br />is <span>more than</span><br />a résumé.</h1>
             <p className="welcome-intro">A conversation can make room for the things a form leaves out. Tell your story in your own words, then shape it into an application that sounds like you.</p>
-            <button className="button button-primary button-large" onClick={begin}>Start with a sample story <span aria-hidden="true">↗</span></button>
-            <p className="sample-note"><span className="sample-dot" /> Sample candidate · fictional details</p>
+            <button className="button button-primary button-large" onClick={begin}>Start your interview <span aria-hidden="true">↗</span></button>
+            <p className="sample-note"><span className="sample-dot" /> Text interview · you control what you share</p>
           </div>
           <div className="welcome-art" aria-label="Illustration of a growing career story">
             <div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" />
@@ -138,27 +180,34 @@ export default function Home() {
             <span className="art-caption">A different way<br />to begin.</span>
           </div>
           <div className="welcome-footer"><div><span className="footer-icon">01</span><span>Start with what you’ve done</span></div><div><span className="footer-icon">02</span><span>Review every suggestion</span></div><div><span className="footer-icon">03</span><span>Keep the final say</span></div></div>
-          <aside className="privacy-note"><span aria-hidden="true">◌</span><p><strong>Your story stays yours.</strong> This demo uses prepared sample content. In a finished version, AI suggestions are only drafts for you to review. Nothing is sent to an employer.</p></aside>
+          <aside className="privacy-note"><span aria-hidden="true">◌</span><p><strong>Your story stays yours.</strong> Your interview text is sent to Google Gemini to generate questions. Access keeps this session in browser memory; resetting or reloading clears it. Share only what you choose. Nothing is sent to an employer.</p></aside>
         </section>}
 
         {step === "story" && <section className="workspace" aria-labelledby="story-heading">
-          <div className="workspace-heading"><div><p className="eyebrow"><span className="eyebrow-line" /> YOUR STORY</p><h1 id="story-heading">Let’s start with what you know.</h1><p>Write the way you’d tell a friend. We’ll help you find the words for your experience.</p></div><span className="demo-tag"><span /> Prepared demo</span></div>
+          <div className="workspace-heading"><div><p className="eyebrow"><span className="eyebrow-line" /> YOUR STORY</p><h1 id="story-heading">Let’s start with what you know.</h1><p>Write the way you’d tell a friend. We’ll help you find the words for your experience.</p></div><span className="demo-tag"><span /> Gemini interview</span></div>
           <div className="mobile-switch" role="group" aria-label="Workspace panel"><button aria-pressed={mobilePanel === "conversation"} onClick={() => setMobilePanel("conversation")}>Conversation</button><button aria-pressed={mobilePanel === "canvas"} onClick={() => setMobilePanel("canvas")}>Career canvas <span className="count-pill">{notes.length}</span></button></div>
           <div className="workspace-grid">
             <section className={`conversation-pane${mobilePanel === "canvas" ? " mobile-hidden" : ""}`} aria-labelledby="conversation-heading">
-              <div className="pane-heading"><div><span className="pane-index">A</span><h2 id="conversation-heading">In your words</h2></div><span className="small-label">SAMPLE CONVERSATION</span></div>
-              <div className="chat-log" aria-label="Conversation">
-                {chat.map((line, index) => <div key={index} className={`chat-line ${line.from}`}><div className="avatar" aria-hidden="true">{line.from === "you" ? "M" : <Mark small />}</div><div><span className="speaker">{line.from === "you" ? "Maya" : "Access · demo response"}</span><p>{line.text}</p></div></div>)}
+              <div className="pane-heading"><div><span className="pane-index">A</span><h2 id="conversation-heading">In your words</h2></div><span className="small-label">AI CONVERSATION</span></div>
+              <div ref={chatLog} className="chat-log" role="region" tabIndex={0} aria-label="Conversation history" aria-busy={pending}>
+                {chat.map((line) => <div key={line.id} className={`chat-line ${line.role === "user" ? "you" : "access"}`}><div className="avatar" aria-hidden="true">{line.role === "user" ? (candidateName[0] || "Y") : <Mark small />}</div><div><span className="speaker">{line.role === "user" ? "You" : "Access · Gemini"}</span><p>{line.content}</p>{line.role === "user" && line.content !== "[Question skipped by candidate]" && <button className="text-button" disabled={pending || interview.status === "ended"} onClick={() => { setCorrectionId(line.id); setMessage(line.content); setError(""); setFailedRequest(null); messageInput.current?.focus(); }}>Correct this answer</button>}</div></div>)}
               </div>
-              <form className="message-form" onSubmit={sendMessage}><label htmlFor="message">Add to your story</label><textarea id="message" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="For example, what do you enjoy about volunteering?" rows={3} /><div className="form-bottom"><span>Share only what you’re comfortable sharing.</span><button className="button button-primary" type="submit" disabled={!message.trim()}>Add to story <span aria-hidden="true">↑</span></button></div></form>
-              <div className="prompt-row"><span>Not sure where to start?</span><button className="prompt-chip" onClick={() => setMessage("I enjoy helping people feel welcome and find what they need.")}>“I enjoy…”</button><button className="prompt-chip" onClick={() => setMessage("A moment I felt proud was when I helped a visitor find the right book for their child.")}>“I felt proud when…”</button></div>
+              <p className="interview-status" role="status">{pending ? "Access is preparing a question…" : interview.status === "ended" ? "Interview ended. Your history is available above." : chat.length ? `Question ${interview.questions} of up to ${interview.limit} · ${interview.answered} answered` : "Start the interview to receive your first question."}</p>
+              {error && <div className="interview-error"><p id="interview-error" role="alert">{error}</p><button className="button button-dark" disabled={pending || !failedRequest} onClick={() => failedRequest && void requestTurn(failedRequest)}>Retry</button></div>}
+              {!chat.length && !pending && !error && interview.status !== "ended" && <button className="button button-primary" onClick={() => void requestTurn({ action: "start", history: [] })}>Start interview</button>}
+              <form className="message-form" onSubmit={sendMessage}><label htmlFor="message">{correctionId ? "Correct your answer" : "Add to your story"}</label>{correctionId && <p id="correction-help">Updating this answer replaces the questions and answers that came after it.</p>}<textarea ref={messageInput} id="message" value={message} onChange={(event) => { setMessage(event.target.value); setError(""); setFailedRequest(null); }} placeholder="Tell us about something you’ve done." rows={3} maxLength={4000} readOnly={pending} aria-invalid={!!error} aria-describedby={error ? "interview-error" : correctionId ? "correction-help" : undefined} /><div className="form-bottom"><span>Share only what you’re comfortable sharing.</span><button className="button button-primary" type="submit" disabled={pending || !message.trim() || !chat.length || interview.status === "ended"}>{pending ? "Please wait…" : correctionId ? "Save correction" : "Send answer"} <span aria-hidden="true">↑</span></button></div></form>
+              <div className="prompt-row">
+                {interview.status !== "ended" ? <><button className="text-button" disabled={pending || !chat.length || !!correctionId} onClick={() => void requestTurn({ action: "skip", history: chat })}>Skip question</button><button className="text-button" onClick={endInterview}>End interview</button></> : <button className="text-button" disabled={pending} onClick={() => void requestTurn({ action: "start", history: [] })}>Start a new interview</button>}
+                {correctionId && <button className="text-button" disabled={pending} onClick={() => { setCorrectionId(null); setMessage(""); setError(""); setFailedRequest(null); }}>Cancel correction</button>}
+              </div>
             </section>
 
             <section className={`canvas-pane${mobilePanel === "conversation" ? " mobile-hidden" : ""}`} aria-labelledby="canvas-heading">
               <div className="pane-heading canvas-title"><div><span className="pane-index">B</span><div><h2 id="canvas-heading">Career canvas</h2><p>A living draft of what you bring.</p></div></div><span className="canvas-glyph" aria-hidden="true">✳</span></div>
-              <div className="candidate-line"><span className="candidate-avatar" aria-hidden="true">{candidateName.slice(0, 1).toUpperCase()}</span><span><label className="sr-only" htmlFor="candidate-name">Candidate name</label><input className="candidate-name" id="candidate-name" value={candidateName} onChange={(event) => setCandidateName(event.target.value)} /><small>Sample candidate · fictional</small></span><span className="edit-name">Editable</span></div>
+              <div className="candidate-line"><span className="candidate-avatar" aria-hidden="true">{candidateName.slice(0, 1).toUpperCase()}</span><span><label className="sr-only" htmlFor="candidate-name">Candidate name</label><input className="candidate-name" id="candidate-name" placeholder="Your name" value={candidateName} onChange={(event) => setCandidateName(event.target.value)} /><small>Your name · optional</small></span><span className="edit-name">Editable</span></div>
               <div className="section-label"><span>EXPERIENCE & STRENGTHS</span><span>{confirmed.length} confirmed</span></div>
               <ul className="note-list">
+                {!notes.length && <li>Add the skills and experience you want to keep below.</li>}
                 {notes.map((note) => <li key={note.id} className={`note-item ${note.status}`}>
                   <span className="note-status" aria-label={note.status === "confirmed" ? "Confirmed" : "Needs your review"}>{note.status === "confirmed" ? "✓" : "· · ·"}</span>
                   <label className="sr-only" htmlFor={`note-${note.id}`}>{note.status === "confirmed" ? "Confirmed experience" : "Suggested experience"}</label>
@@ -171,7 +220,7 @@ export default function Home() {
               <button className="button button-dark continue-button" onClick={() => { setStep("application"); setAnnouncement("Choose a fictional role to prepare your draft."); }}>Choose a role <span aria-hidden="true">→</span></button>
             </section>
           </div>
-          <p className="demo-disclaimer">AI responses in this preview are prepared examples, not live AI output.</p>
+          <p className="demo-disclaimer">Interview questions are generated by Gemini. Add your own canvas details; application drafts use a prepared demo format.</p>
         </section>}
 
         {step === "application" && <section className="application" aria-labelledby="application-heading">

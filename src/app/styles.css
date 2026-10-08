@@ -13,3 +13,12 @@
 @media(max-width:360px){.app{padding:0 14px}.welcome h1{font-size:48px}.button-large{width:100%;justify-content:space-between}.journey{gap:24px}.journey-step{font-size:11px}.conversation-pane,.canvas-pane{padding-left:12px;padding-right:12px}.workspace-heading h1,.application-heading h1{font-size:32px}.job-description ul{columns:1}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
 .reduced-motion *, .reduced-motion *::before, .reduced-motion *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+
+/* Async interview states use the existing palette and panel layout. */
+.interview-status { min-height: 3em; margin: 0; padding: 12px 0; }
+.interview-error { padding: 12px 0; }
+.interview-error p { font-weight: 600; }
+.chat-log .text-button { margin-top: 8px; }
+
+/* Keep the keyboard skip link hidden when reduced motion disables transforms. */
+.skip-link:not(:focus) { clip-path: inset(100%); }
