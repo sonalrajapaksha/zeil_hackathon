@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HeroPreview } from "@/components/HeroPreview";
 import { LiveVoice } from "@/components/LiveVoice";
 import { DEMO_JOBS } from "@/lib/jobs";
 import { ApplicationErrorSchema, ApplicationPackageSchema, CLARIFICATION_REQUEST, ConversationErrorSchema, ConversationResponseSchema, CvImportErrorSchema, CvImportResponseSchema, type ApplicationPackage, type CandidateProfile, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
+import { appendProfileSuggestions, type ProfileSuggestion } from "@/lib/profile-suggestions";
 import { EMPTY_INTERVIEW, progress } from "@/lib/interview";
 import { deleteSavedProfile, loadSavedProfile, saveProfile } from "@/lib/persistence";
 
@@ -81,6 +82,10 @@ export default function Home() {
   const [announcement, setAnnouncement] = useState("");
   const selected = DEMO_JOBS.find((job) => job.id === selectedJob)!;
 
+  const addProfileSuggestions = useCallback((items: ProfileSuggestion[]) => {
+    setProfile((current) => appendProfileSuggestions(current, items));
+  }, []);
+
   async function requestTurn(request: ConversationRequest) {
     if (activeRequest.current) return;
     const controller = new AbortController();
@@ -113,21 +118,7 @@ export default function Home() {
           education: current.education.filter((item) => item.confirmed || !replacedAnswers.some((answer) => answer.includes(item.evidence))),
         }));
       }
-      if (result.suggestions.length) {
-        const incoming = result.suggestions.map((suggestion) => ({ ...suggestion, id: crypto.randomUUID(), confirmed: false }));
-        setProfile((current) => {
-          const next = { ...current, skills: [...current.skills], experience: [...current.experience], education: [...current.education] };
-          for (const item of incoming) {
-            const currentClaims = [...next.skills.map((claim) => ({ kind: "skill", text: claim.name })), ...next.experience.map((claim) => ({ kind: "experience", text: "text" in claim ? claim.text : claim.role })), ...next.education.map((claim) => ({ kind: "education", text: claim.text }))];
-            const duplicate = currentClaims.some((claim) => claim.kind === item.kind && claim.text.toLocaleLowerCase() === item.text.toLocaleLowerCase());
-            if (duplicate) continue;
-            if (item.kind === "skill") next.skills.push({ id: item.id, name: item.text, evidence: item.evidence, confirmed: false });
-            else if (item.kind === "experience") next.experience.push({ id: item.id, text: item.text, evidence: [item.evidence], confirmed: false });
-            else next.education.push({ id: item.id, text: item.text, evidence: item.evidence, confirmed: false });
-          }
-          return next;
-        });
-      }
+      if (result.suggestions.length) addProfileSuggestions(result.suggestions);
       if (request.action !== "clarify") setMessage("");
       setCorrectionId(null);
       setAnnouncement(result.interview.status === "ended" ? "Interview ended. Your history is available for review." : result.toolTrace.selected ? `Gemini selected the profile update tool. ${result.toolTrace.arguments.length} validated suggestion${result.toolTrace.arguments.length === 1 ? " is" : "s are"} ready for your review.` : result.suggestions.length ? `A new AI question and ${result.suggestions.length} profile suggestion${result.suggestions.length === 1 ? "" : "s"} to review are ready.` : "A new AI question is ready.");
@@ -288,19 +279,7 @@ export default function Home() {
       const parsed = CvImportResponseSchema.safeParse(body);
       if (!parsed.success) throw new Error("Gemini returned an unusable result. Your profile is unchanged.");
       const suggestions = parsed.data.suggestions;
-      setProfile((current) => {
-        const next = { ...current, skills: [...current.skills], experience: [...current.experience], education: [...current.education] };
-        for (const suggestion of suggestions) {
-          const text = suggestion.text.trim();
-          const existing = [...next.skills.map((item) => ({ kind: "skill", text: item.name })), ...next.experience.map((item) => ({ kind: "experience", text: "text" in item ? item.text : item.role })), ...next.education.map((item) => ({ kind: "education", text: item.text }))];
-          if (existing.some((item) => item.kind === suggestion.kind && item.text.toLocaleLowerCase() === text.toLocaleLowerCase())) continue;
-          const id = crypto.randomUUID();
-          if (suggestion.kind === "skill") next.skills.push({ id, name: text, evidence: suggestion.evidence, confirmed: false });
-          else if (suggestion.kind === "experience") next.experience.push({ id, text, evidence: [suggestion.evidence], confirmed: false });
-          else next.education.push({ id, text, evidence: suggestion.evidence, confirmed: false });
-        }
-        return next;
-      });
+      addProfileSuggestions(suggestions);
       setAnnouncement(suggestions.length ? `${suggestions.length} CV suggestion${suggestions.length === 1 ? " is" : "s are"} ready for your review. Nothing was confirmed.` : "The PDF was read, but no work-related suggestions were found.");
       form.reset();
     } catch (failure) {
@@ -403,7 +382,7 @@ export default function Home() {
           <div className="workspace-grid">
             <section className={`conversation-pane${mobilePanel === "canvas" ? " mobile-hidden" : ""}`} aria-labelledby="conversation-heading">
               <div className="pane-heading"><div><h2 id="conversation-heading">In your words</h2></div></div>
-              <LiveVoice initiallyOpen={voiceFirst} questionStyle={profile.preferences.questionStyle} available={!pending && mobilePanel === "conversation"} onUseText={reviewVoiceAnswer} />
+              <LiveVoice initiallyOpen={voiceFirst} questionStyle={profile.preferences.questionStyle} available={!pending && mobilePanel === "conversation"} onSuggestions={addProfileSuggestions} onUseText={reviewVoiceAnswer} />
               <div ref={chatLog} className={`chat-log${!chat.length ? " is-empty" : ""}`} role="region" tabIndex={chat.length ? 0 : -1} aria-label="Conversation history" aria-busy={pending}>
                 {chat.map((line) => <div key={line.id} className={`chat-line ${line.role === "user" ? "you" : "access"}`}><div className="avatar" aria-hidden="true">{line.role === "user" ? (profile.name?.[0] || "Y") : <Mark small />}</div><div><span className="speaker">{line.role === "user" ? "You" : "Access · Gemini"}</span><p>{line.content === CLARIFICATION_REQUEST ? "Could you clarify this question?" : line.content}</p>{line.role === "user" && !["[Question skipped by candidate]", CLARIFICATION_REQUEST].includes(line.content) && <button className="text-button" disabled={pending || interview.status === "ended"} onClick={() => { setCorrectionId(line.id); setMessage(line.content); setError(""); setFailedRequest(null); messageInput.current?.focus(); }}>Correct this answer</button>}</div></div>)}
               </div>

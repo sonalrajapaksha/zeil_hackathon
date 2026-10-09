@@ -1,4 +1,5 @@
 import { GoogleGenAI, ApiError, ThinkingLevel, FunctionCallingConfigMode, type Content } from '@google/genai';
+import { SENSITIVE_PROFILE_CLAIM as SENSITIVE_CLAIM, validateProfileSuggestions } from '../../../lib/profile-suggestions.ts';
 import { z } from 'zod';
 import { CLARIFICATION_REQUEST, ConversationRequestSchema, ConversationResponseSchema, INTERVIEW_LIMIT, type ConversationErrorSchema } from '../../../lib/contracts.ts';
 import { END_REPLY, prepareTurn, progress } from '../../../lib/interview.ts';
@@ -14,7 +15,7 @@ const ModelOutputSchema = z.object({
   'Ask exactly one question.',
 );
 const ProfileUpdatesSchema = z.object({ items: ConversationResponseSchema.shape.suggestions }).strict();
-const SENSITIVE_CLAIM = /\b(?:disabilit\w*|autis\w*|adhd|diagnos\w*|medical\w*|health condition\w*|mental health|medicat\w*|wheelchair\w*|blind\w*|deaf\w*|screen reader|assistive technolog\w*|dyslex\w*|dysprax\w*|epilep\w*|bipolar|ptsd|chronic illness|hearing loss|access needs?|accommodat\w*)\b/i;
+
 const PROFILE_TOOL = {
   name: 'propose_profile_updates',
   description: 'Propose concise work-related profile claims directly supported by the candidate’s latest answer. Use only exact quoted evidence. Never infer sensitive details.',
@@ -99,11 +100,7 @@ export async function POST(request: Request) {
         const { items } = ProfileUpdatesSchema.parse(call.args);
         const latestAnswer = history.at(-1)?.role === 'user' ? history.at(-1)!.content : '';
         if (!latestAnswer || ['[Question skipped by candidate]', CLARIFICATION_REQUEST].includes(latestAnswer)) throw new Error('No candidate answer for profile proposals');
-        if (items.some(({ evidence }) => !latestAnswer.toLocaleLowerCase().includes(evidence.toLocaleLowerCase()))) throw new Error('Tool evidence is not from the latest answer');
-        const normalise = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
-        const uniqueByClaim = new Map<string, typeof items[number]>();
-        for (const item of items.filter(({ text, evidence }) => !SENSITIVE_CLAIM.test(text) && !SENSITIVE_CLAIM.test(evidence))) uniqueByClaim.set(`${item.kind}:${normalise(item.text)}`, uniqueByClaim.get(`${item.kind}:${normalise(item.text)}`) ?? item);
-        const unique = [...uniqueByClaim.values()];
+        const unique = validateProfileSuggestions(items, latestAnswer);
         executedSuggestions = unique;
         const functionContent = response.candidates?.[0]?.content;
         if (!functionContent) throw new Error('Missing function-call content');

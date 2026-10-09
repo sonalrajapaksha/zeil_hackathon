@@ -27,6 +27,7 @@ try {
       reply: 'What experience would you like to share?', suggestions: [], toolTrace: { selected: false, functionName: null, arguments: [], dispatched: false, outcome: 'no_tool_selected' },
       history: [{ id: 'q1', role: 'assistant', content: 'What experience would you like to share?' }], interview: { status: 'active', questions: 1, answered: 0, limit: 12 },
     } }));
+    await page.route('**/api/profile-proposals', (route) => route.fulfill({ json: { suggestions: [] } }));
     let tokenFails = false;
     await page.route('**/api/live-token', (route) => route.fulfill(tokenFails ? { status: 503, json: { error: { message: 'Voice is unavailable. Continue by text.' } } } : { json: { token: 'auth_tokens/browser-fixture', model: 'test-live', expiresAt: new Date(Date.now() + 300000).toISOString() } }));
     let socket, holdSetup = false, closed = false;

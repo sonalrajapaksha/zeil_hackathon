@@ -11,6 +11,8 @@
     "test:gemini": "node --env-file-if-exists=.env --env-file-if-exists=.env.local tests/gemini-smoke.ts",
     "test:browser": "node tests/browser-smoke.mjs",
     "test:redesign-browser": "node tests/redesign-browser.mjs",
+    "test:voice-canvas-browser": "node tests/voice-canvas-browser.mjs",
+    "test:voice-profile-gemini": "node --env-file-if-exists=.env --env-file-if-exists=.env.local tests/voice-profile-gemini-smoke.ts",
     "test:live-browser": "node tests/live-browser.mjs",
     "test:live-gemini": "node --env-file-if-exists=.env --env-file-if-exists=.env.local tests/live-gemini-smoke.ts"
   },

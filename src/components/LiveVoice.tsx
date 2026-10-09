@@ -1,19 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
+import { collectVoiceAnswer, type VoiceAnswerBuffer } from '@/lib/live-answers';
+import { CvImportErrorSchema, INTERVIEW_LIMIT, ProfileProposalsResponseSchema } from '@/lib/contracts';
+import type { ProfileSuggestion } from '@/lib/profile-suggestions';
 import { encodePcm, decodePcm } from '@/lib/live-audio';
 import type { LiveServerMessage } from '@google/genai';
 
+type VoiceTurn = { id: string; answer: string; status: 'queued' | 'done' | 'error'; error?: string };
 type Transcript = { role: 'You' | 'Access · Gemini Live'; text: string };
 type Resources = {
   cancelled: boolean; ready: boolean; muted: boolean; controller: AbortController;
   stream?: MediaStream; context?: AudioContext; source?: MediaStreamAudioSourceNode;
   capture?: AudioWorkletNode; socket?: WebSocket; session?: { sendRealtimeInput: (input: unknown) => void; sendClientContent: (input: unknown) => void }; timer?: ReturnType<typeof setTimeout>;
-  sources: Set<AudioBufferSourceNode>; nextPlay: number;
+  sources: Set<AudioBufferSourceNode>; nextPlay: number; answer: VoiceAnswerBuffer;
 };
 
-export function LiveVoice({ questionStyle, available, onUseText, initiallyOpen = false }: {
-  initiallyOpen?: boolean; questionStyle?: 'simple' | 'standard'; available: boolean; onUseText: (text: string) => void;
+export function LiveVoice({ questionStyle, available, onUseText, onSuggestions, initiallyOpen = false }: {
+  onSuggestions: (items: ProfileSuggestion[]) => void; initiallyOpen?: boolean; questionStyle?: 'simple' | 'standard'; available: boolean; onUseText: (text: string) => void;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const [state, setState] = useState<'idle' | 'connecting' | 'live'>('idle');
@@ -21,12 +25,48 @@ export function LiveVoice({ questionStyle, available, onUseText, initiallyOpen =
   const [error, setError] = useState('');
   const [muted, setMuted] = useState(false);
   const [transcript, setTranscript] = useState<Transcript[]>([]);
+  const [voiceTurns, setVoiceTurns] = useState<VoiceTurn[]>([]);
+  const [answerNotice, setAnswerNotice] = useState('');
+  const nextTurn = voiceTurns.find((turn) => turn.status === 'queued');
+  const failedTurn = voiceTurns.find((turn) => turn.status === 'error');
+  const queuedCount = voiceTurns.filter((turn) => turn.status === 'queued').length;
   const resources = useRef<Resources | null>(null);
   const transcriptRole = useRef<Transcript['role'] | null>(null);
   const startButton = useRef<HTMLButtonElement>(null);
   const waveform = useRef<SVGPathElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const active = state !== 'idle';
+
+  // One bounded extraction at a time, independent of microphone/session state.
+  useEffect(() => {
+    if (!nextTurn) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 35_000);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch('/api/profile-proposals', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answer: nextTurn.answer }), signal: controller.signal,
+        });
+        const body: unknown = await response.json();
+        if (!response.ok) {
+          const failure = CvImportErrorSchema.safeParse(body);
+          throw new Error(failure.success ? failure.data.error.message : 'Voice suggestions are unavailable. Retry suggestions or use text.');
+        }
+        const { suggestions } = ProfileProposalsResponseSchema.parse(body);
+        if (cancelled) return;
+        onSuggestions(suggestions);
+        setVoiceTurns((turns) => turns.map((turn) => turn.id === nextTurn.id ? { ...turn, answer: '', status: 'done' } : turn));
+        setAnswerNotice(suggestions.length ? 'Voice suggestions are ready in your Career Canvas. Review each one before approving.' : 'Voice answer reviewed. No new career details were found.');
+      } catch (failure) {
+        if (cancelled) return;
+        const message = controller.signal.aborted ? 'Voice suggestions took too long. Retry suggestions or use text.' : failure instanceof Error && !(failure.name === 'ZodError') ? failure.message : 'Voice suggestions could not be checked. Retry suggestions or use text.';
+        setVoiceTurns((turns) => turns.map((turn) => turn.id === nextTurn.id ? { ...turn, status: 'error', error: message } : turn));
+      } finally { clearTimeout(timeout); }
+    })();
+    return () => { cancelled = true; clearTimeout(timeout); controller.abort(); };
+  }, [nextTurn, onSuggestions]);
 
   function clearPlayback(current: Resources) {
     for (const source of current.sources) { source.onended = null; try { source.stop(); } catch { /* A failed start has no playback to stop. */ } source.disconnect(); }
@@ -126,7 +166,7 @@ export function LiveVoice({ questionStyle, available, onUseText, initiallyOpen =
       setError('Live voice needs a browser with microphone and audio support on HTTPS or localhost. Continue by text.');
       return;
     }
-    const current: Resources = { cancelled: false, ready: false, muted: false, controller: new AbortController(), sources: new Set(), nextPlay: 0 };
+    const current: Resources = { cancelled: false, ready: false, muted: false, controller: new AbortController(), sources: new Set(), nextPlay: 0, answer: { text: '', overflow: false, suppressed: false, interrupted: false } };
     resources.current = current;
     const valid = () => resources.current === current && !current.cancelled;
     const fail = () => { if (valid()) stop('Voice is off.', 'Voice disconnected. Retry voice or continue by text. Your text and profile are unchanged.'); };
@@ -180,6 +220,12 @@ export function LiveVoice({ questionStyle, available, onUseText, initiallyOpen =
             const when = Math.max(context.currentTime, current.nextPlay);
             source.start(when); current.nextPlay = when + buffer.duration;
             setStatus('Gemini is speaking. You can interrupt or stop.');
+          }
+          const completed = collectVoiceAnswer(current.answer, content);
+          if (completed?.tooLong) setAnswerNotice('This voice answer is too long for automatic suggestions. Review a shorter version by text.');
+          else if (completed?.answer) {
+            const turn: VoiceTurn = { id: crypto.randomUUID(), answer: completed.answer, status: 'queued' };
+            setVoiceTurns((turns) => turns.length < INTERVIEW_LIMIT ? [...turns, turn] : turns);
           }
           if (content.turnComplete) transcriptRole.current = null;
         } catch { fail(); }
@@ -244,6 +290,8 @@ export function LiveVoice({ questionStyle, available, onUseText, initiallyOpen =
     try { if (current.muted) current.session.sendRealtimeInput({ audioStreamEnd: true }); } catch { stop('Voice is off.', 'Voice disconnected. Continue by text or retry.'); }
   }
   function command(text: string) {
+    const current = resources.current;
+    if (current) { current.answer.text = ''; current.answer.overflow = false; current.answer.suppressed = true; }
     try { resources.current?.session?.sendClientContent({ turns: [{ role: 'user', parts: [{ text }] }], turnComplete: true }); }
     catch { stop('Voice is off.', 'Voice disconnected. Continue by text or retry.'); }
   }
@@ -253,7 +301,7 @@ export function LiveVoice({ questionStyle, available, onUseText, initiallyOpen =
   return <section className="live-voice" aria-labelledby="live-heading">
     <h3 id="live-heading"><button type="button" className="text-button" aria-expanded={open} aria-controls="live-controls" onClick={() => { if (open) stop(); setOpen(!open); }}>Voice conversation</button></h3>
     {open && <div id="live-controls">
-      <p>Talk with Gemini Live and hear its replies. Starting requests microphone permission and sends audio directly to Google Gemini. Access does not record audio or save this transcript. Voice practice is separate from your text interview and career canvas.</p>
+      <p>Talk with Gemini Live and hear its replies. Starting requests microphone permission and sends audio directly to Google Gemini. Completed voice answers are also sent to Gemini to suggest skills, experience and education in your Career Canvas. Review and approve each suggestion before it can appear in a draft. Access does not record audio or save the full transcript.</p>
       <div ref={stage} className="voice-stage" data-voice-state={visualState}>
         <div className="voice-signal" aria-hidden="true"><span /><span /><span /><svg viewBox="0 0 240 80"><path ref={waveform} d="M0 40 L240 40" /></svg></div>
         <p className="voice-state-label">{visualState === 'speaking' ? 'Access is speaking' : visualState === 'listening' ? 'Listening · microphone on' : visualState === 'interrupted' ? 'Interrupted · listening to you' : visualState === 'muted' ? 'Microphone muted' : visualState === 'connecting' ? 'Getting connected' : visualState === 'error' ? 'Let’s try again' : 'Ready when you are'}</p>
@@ -267,8 +315,13 @@ export function LiveVoice({ questionStyle, available, onUseText, initiallyOpen =
         <button type="button" className="text-button" disabled={!active} onClick={() => { stop(); startButton.current?.focus(); }}>Stop voice</button>
       </div>
       {state === 'live' && <div className="live-actions"><button type="button" className="text-button" onClick={() => command('Skip this voice question and ask about a different work-related topic.')}>Skip voice question</button><button type="button" className="text-button" onClick={() => command('Please clarify the current voice question, then restate it. This is not a career answer.')}>Clarify voice question</button></div>}
+      <div className="voice-discovery">
+        <p role="status">{queuedCount ? `Discovering career details from ${queuedCount} voice answer${queuedCount === 1 ? '' : 's'}… You can keep talking.` : answerNotice || 'Your completed answers will become suggestions here. You keep the final say.'}</p>
+        {failedTurn && <div role="alert"><p>{failedTurn.error}</p><button type="button" className="text-button" onClick={() => setVoiceTurns((turns) => turns.map((turn) => turn.status === 'error' ? { ...turn, status: 'queued', error: undefined } : turn))}>Retry voice suggestions</button></div>}
+        {voiceTurns.length >= INTERVIEW_LIMIT && <p>Automatic suggestions cover up to {INTERVIEW_LIMIT} voice answers in this workspace. You can continue sharing details by text.</p>}
+      </div>
       {transcript.length > 0 && <details className="transcript-disclosure" open><summary>Live transcript · {transcript.length} turns</summary><div className="live-transcript" role="region" tabIndex={0} aria-label="Voice practice transcript"><p>Automatic transcript · text may still be arriving. Check for mistakes before using an answer.</p>{transcript.map((line, index) => <div key={index}><strong>{line.role}</strong><p>{line.text}</p>{line.role === 'You' && <button type="button" className="text-button" onClick={() => { stop(); onUseText(line.text); }}>Review this answer in text</button>}</div>)}</div></details>}
-      <p>You can stop and use the text controls below at any time. Voice answers are never added to your profile automatically.</p>
+      <p>You can stop and use the text controls below at any time. Voice suggestions stay unconfirmed until you approve them. You can also review an answer in text to correct transcription mistakes.</p>
     </div>}
   </section>;
 }

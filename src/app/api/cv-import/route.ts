@@ -1,4 +1,5 @@
 import { ApiError, GoogleGenAI, ThinkingLevel } from '@google/genai';
+import { SENSITIVE_PROFILE_CLAIM as SENSITIVE } from '../../../lib/profile-suggestions.ts';
 import { z } from 'zod';
 import { CvImportResponseSchema } from '../../../lib/contracts.ts';
 
@@ -7,7 +8,7 @@ export const maxDuration = 40;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_BODY_BYTES = MAX_FILE_BYTES + 64 * 1024;
 const EvidenceScreenSchema = z.object({ findings: z.array(z.object({ index: z.number().int().min(0).max(4), supported: z.boolean(), sensitive: z.boolean() }).strict()).max(5) }).strict();
-const SENSITIVE = /\b(?:disabilit\w*|autis\w*|adhd|diagnos\w*|medical\w*|health condition\w*|mental health|medicat\w*|wheelchair\w*|blind\w*|deaf\w*|screen reader|assistive technolog\w*|dyslex\w*|dysprax\w*|epilep\w*|bipolar|ptsd|chronic illness|hearing loss|access needs?|accommodat\w*|sexual orientation|gender identity|ethnic\w*|racial\w*|religio\w*|veteran status|military veteran|date of birth|\bage\b|citizenship|marital status|pregnan\w*)/i;
+
 
 type ErrorCode = z.infer<typeof import('../../../lib/contracts.ts').CvImportErrorSchema>['error']['code'];
 function failure(code: ErrorCode, message: string, status: number, retryable = false) {

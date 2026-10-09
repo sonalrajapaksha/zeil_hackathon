@@ -19,7 +19,9 @@ export const ApplicationErrorSchema = z.object({
     message: z.string(), retryable: z.boolean(),
   }).strict(),
 }).strict();
-export const CvImportResponseSchema = z.object({ suggestions: z.array(z.object({ kind: z.enum(['skill', 'experience', 'education']), text: z.string().trim().min(1).max(240), evidence: z.string().trim().min(1).max(400) }).strict()).max(5) }).strict();
+export const ProfileProposalsResponseSchema = z.object({ suggestions: z.array(z.object({ kind: z.enum(['skill', 'experience', 'education']), text: z.string().trim().min(1).max(240), evidence: z.string().trim().min(1).max(400) }).strict()).max(5) }).strict();
+export const CvImportResponseSchema = ProfileProposalsResponseSchema;
+export const VoiceProfileRequestSchema = z.object({ answer: z.string().trim().min(1).max(4000) }).strict();
 export const CvImportErrorSchema = z.object({ error: z.object({ code: z.enum(['INVALID_REQUEST', 'NOT_CONFIGURED', 'TIMEOUT', 'RATE_LIMITED', 'PROVIDER_ERROR', 'INVALID_RESPONSE']), message: z.string(), retryable: z.boolean() }).strict() }).strict();
 export type ApplicationRequest = z.infer<typeof ApplicationRequestSchema>;
 export type CandidateProfile = z.infer<typeof CandidateProfileSchema>;
@@ -67,7 +69,7 @@ export const InterviewProgressSchema = z.object({
 }).strict();
 export const ConversationResponseSchema = z.object({
   reply: z.string().trim().min(1).max(700),
-  suggestions: z.array(z.object({ kind:z.enum(['skill','experience','education']), text:z.string().trim().min(1).max(240), evidence:z.string().trim().min(1).max(400) }).strict()).max(5),
+  suggestions: ProfileProposalsResponseSchema.shape.suggestions,
   toolTrace: z.object({ selected:z.boolean(), functionName:z.string().nullable(), arguments:z.array(z.object({ kind:z.enum(['skill','experience','education']), text:z.string().trim().min(1).max(240), evidence:z.string().trim().min(1).max(400) }).strict()).max(5), dispatched:z.boolean(), outcome:z.enum(['no_tool_selected','pending_for_review','no_safe_items']) }).strict(),
   history: InterviewHistorySchema,
   interview: InterviewProgressSchema,
