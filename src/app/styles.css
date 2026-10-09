@@ -102,3 +102,14 @@ input,textarea{caret-color:var(--purple-dark)}
 .reduced-motion .preview-motion-control{display:none}
 @media(prefers-reduced-motion:reduce){.preview-motion-control{display:none}}
 .voice-stage .voice-question{max-height:8em;overflow-y:auto;overscroll-behavior:contain}
+
+/* Microphone health is also described in text; colour is an extra cue. */
+.voice-stage{--signal-color:var(--purple-dark)}
+.voice-stage:is([data-voice-state=listening],[data-voice-state=interrupted],[data-voice-state=speaking]){--signal-color:#237640}
+.voice-stage[data-voice-state=error]{--signal-color:#b4232c}
+.voice-stage[data-voice-state=muted]{--signal-color:var(--muted)}
+.voice-signal>span{border-color:var(--signal-color)}
+.voice-signal svg{stroke:var(--signal-color)}
+.voice-stage .voice-state-label{color:var(--signal-color)}
+.voice-stage[data-voice-state=error] .voice-signal{opacity:1}
+.voice-stage[data-voice-state=speaking] .voice-signal>span{background:transparent}

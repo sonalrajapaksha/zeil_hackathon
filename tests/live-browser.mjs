@@ -5,7 +5,7 @@ const browser = await chromium.launch({ headless: true, args: ['--use-fake-ui-fo
 const baseURL = process.env.ACCESS_TEST_URL || 'http://localhost:3013';
 try {
   for (const width of [1440, 1024, 768, 390, 320]) {
-    const page = await browser.newPage({ viewport: { width, height: 1000 }, reducedMotion: 'reduce' });
+    const page = await browser.newPage({ viewport: { width, height: 1000 }, reducedMotion: width === 1440 ? 'no-preference' : 'reduce' });
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.addInitScript(() => {
@@ -50,6 +50,7 @@ try {
     await page.evaluate(() => { window.denyMic = true; });
     await start.focus(); await page.keyboard.press('Enter');
     await page.getByRole('alert').filter({ hasText: 'Microphone permission was not granted' }).waitFor();
+    assert.equal(await page.locator('.voice-signal svg').evaluate((el) => getComputedStyle(el).stroke), 'rgb(180, 35, 44)', 'Microphone denial turns the signal red');
     assert.equal(await page.locator('#message').inputValue(), 'My unsent answer stays here.');
     await page.evaluate(() => { window.denyMic = false; });
     tokenFails = true;
@@ -63,11 +64,15 @@ try {
     for (let attempt = 0; attempt < 50 && !messages.some((message) => message.realtimeInput?.audio); attempt++) await page.waitForTimeout(100);
     assert.ok(messages.some((message) => message.realtimeInput?.audio?.mimeType.startsWith('audio/pcm;rate=')), 'microphone frames use realtimeInput');
     await page.locator('.voice-stage[data-voice-state="listening"]').waitFor();
+    assert.equal(await page.locator('.voice-signal svg').evaluate((el) => getComputedStyle(el).stroke), 'rgb(35, 118, 64)', 'Working microphone turns the signal green');
+    if (width === 1440) await page.waitForFunction(() => [...document.querySelector('.voice-signal path').getAttribute('d').matchAll(/[ML]\d+ ([\d.-]+)/g)].some((point) => Math.abs(Number(point[1]) - 40) > 0.1));
+    else assert.equal(await page.locator('.voice-signal path').getAttribute('d'), 'M0 40 L240 40', 'Reduced motion keeps the waveform static');
     const sessionCount = messages.filter((message) => message.setup).length;
     await start.evaluate((el) => el.click());
     assert.equal(messages.filter((message) => message.setup).length, sessionCount, 'Disabled start never duplicates the session');
     await page.getByRole('button', { name: 'Mute microphone', exact: true }).click();
     await page.locator('.voice-stage[data-voice-state="muted"]').waitFor();
+    await page.waitForFunction(() => document.querySelector('.voice-signal path').getAttribute('d') === 'M0 40 L240 40');
     assert.ok(await page.evaluate(() => window.liveTracks.filter((track) => track.readyState === 'live').every((track) => !track.enabled)));
     assert.ok(messages.some((message) => message.realtimeInput?.audioStreamEnd));
     await page.getByRole('button', { name: 'Unmute microphone' }).click();

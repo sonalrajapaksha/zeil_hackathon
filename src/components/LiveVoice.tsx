@@ -24,6 +24,8 @@ export function LiveVoice({ questionStyle, available, onUseText, initiallyOpen =
   const resources = useRef<Resources | null>(null);
   const transcriptRole = useRef<Transcript['role'] | null>(null);
   const startButton = useRef<HTMLButtonElement>(null);
+  const waveform = useRef<SVGPathElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
   const active = state !== 'idle';
 
   function clearPlayback(current: Resources) {
@@ -65,6 +67,46 @@ export function LiveVoice({ questionStyle, available, onUseText, initiallyOpen =
     window.addEventListener('pagehide', leave);
     return () => { document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', leave); };
   }, []);
+
+  // A passive branch observes the microphone; it never sits in the PCM send path.
+  useEffect(() => {
+    const current = resources.current;
+    const path = waveform.current;
+    const flat = 'M0 40 L240 40';
+    path?.setAttribute('d', flat);
+    if (state !== 'live' || muted || !open || !current?.source || !current.context || !path) return;
+    const analyser = current.context.createAnalyser();
+    analyser.fftSize = 256;
+    const samples = new Float32Array(analyser.fftSize);
+    const systemMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    let frame = 0;
+    let lastDraw = 0;
+    current.source.connect(analyser); // No connection to speakers: no feedback.
+    function draw(now: number) {
+      if (resources.current !== current || current!.cancelled) return;
+      if (now - lastDraw >= 50) {
+        lastDraw = now;
+        const reduced = systemMotion.matches || !!stage.current?.closest('.reduced-motion');
+        if (reduced) path!.setAttribute('d', flat);
+        else {
+          analyser.getFloatTimeDomainData(samples);
+          const points = Array.from({ length: 49 }, (_, index) => {
+            const sample = samples[Math.min(samples.length - 1, Math.round(index * (samples.length - 1) / 48))];
+            return `${index === 0 ? 'M' : 'L'}${index * 5} ${(40 - Math.max(-1, Math.min(1, sample * 5)) * 32).toFixed(2)}`;
+          });
+          path!.setAttribute('d', points.join(' '));
+        }
+      }
+      frame = requestAnimationFrame(draw);
+    }
+    frame = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(frame);
+      try { current.source?.disconnect(analyser); } catch { /* Session cleanup may already have disconnected the source. */ }
+      analyser.disconnect();
+      path.setAttribute('d', flat);
+    };
+  }, [state, muted, open]);
 
   function append(role: Transcript['role'], text: string) {
     const continuing = transcriptRole.current === role;
@@ -212,8 +254,8 @@ export function LiveVoice({ questionStyle, available, onUseText, initiallyOpen =
     <h3 id="live-heading"><button type="button" className="text-button" aria-expanded={open} aria-controls="live-controls" onClick={() => { if (open) stop(); setOpen(!open); }}>Voice conversation</button></h3>
     {open && <div id="live-controls">
       <p>Talk with Gemini Live and hear its replies. Starting requests microphone permission and sends audio directly to Google Gemini. Access does not record audio or save this transcript. Voice practice is separate from your text interview and career canvas.</p>
-      <div className="voice-stage" data-voice-state={visualState}>
-        <div className="voice-signal" aria-hidden="true"><span /><span /><span /><svg viewBox="0 0 240 80"><path d="M0 40 C20 40 20 40 40 40 S60 8 80 40 S100 72 120 40 S140 8 160 40 S180 40 200 40 S220 40 240 40" /></svg></div>
+      <div ref={stage} className="voice-stage" data-voice-state={visualState}>
+        <div className="voice-signal" aria-hidden="true"><span /><span /><span /><svg viewBox="0 0 240 80"><path ref={waveform} d="M0 40 L240 40" /></svg></div>
         <p className="voice-state-label">{visualState === 'speaking' ? 'Access is speaking' : visualState === 'listening' ? 'Listening · microphone on' : visualState === 'interrupted' ? 'Interrupted · listening to you' : visualState === 'muted' ? 'Microphone muted' : visualState === 'connecting' ? 'Getting connected' : visualState === 'error' ? 'Let’s try again' : 'Ready when you are'}</p>
         <p className="voice-question" tabIndex={0} aria-label="Current voice turn">{currentQuestion || 'Your experiences matter. Let’s discover what they mean.'}</p>
       </div>
