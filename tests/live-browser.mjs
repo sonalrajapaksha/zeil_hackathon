@@ -64,9 +64,17 @@ try {
     for (let attempt = 0; attempt < 50 && !messages.some((message) => message.realtimeInput?.audio); attempt++) await page.waitForTimeout(100);
     assert.ok(messages.some((message) => message.realtimeInput?.audio?.mimeType.startsWith('audio/pcm;rate=')), 'microphone frames use realtimeInput');
     await page.locator('.voice-stage[data-voice-state="listening"]').waitFor();
-    assert.equal(await page.locator('.voice-signal svg').evaluate((el) => getComputedStyle(el).stroke), 'rgb(35, 118, 64)', 'Working microphone turns the signal green');
+    assert.equal(await page.locator('.voice-signal svg').evaluate((el) => getComputedStyle(el).stroke), 'rgb(255, 255, 255)', 'Working microphone has a white waveform');
+    assert.equal(await page.locator('.voice-stage').evaluate((el) => getComputedStyle(el).backgroundColor), 'rgb(35, 118, 64)', 'Working voice fills the stage green');
+    assert.equal(await page.locator('.voice-question').evaluate((el) => getComputedStyle(el).color), 'rgb(255, 255, 255)', 'Active-stage text is white');
     if (width === 1440) await page.waitForFunction(() => [...document.querySelector('.voice-signal path').getAttribute('d').matchAll(/[ML]\d+ ([\d.-]+)/g)].some((point) => Math.abs(Number(point[1]) - 40) > 0.1));
     else assert.equal(await page.locator('.voice-signal path').getAttribute('d'), 'M0 40 L240 40', 'Reduced motion keeps the waveform static');
+    await page.locator('.preferences summary').click();
+    await page.getByLabel('Higher contrast').check();
+    assert.equal(await page.locator('.voice-stage').evaluate((el) => getComputedStyle(el).backgroundColor), 'rgb(20, 83, 45)', 'High contrast uses a darker green stage');
+    assert.equal(await page.locator('.voice-question').evaluate((el) => getComputedStyle(el).color), 'rgb(255, 255, 255)', 'High contrast keeps active text white');
+    await page.getByLabel('Higher contrast').uncheck();
+    await page.locator('.preferences summary').click();
     const sessionCount = messages.filter((message) => message.setup).length;
     await start.evaluate((el) => el.click());
     assert.equal(messages.filter((message) => message.setup).length, sessionCount, 'Disabled start never duplicates the session');

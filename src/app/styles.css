@@ -105,7 +105,9 @@ input,textarea{caret-color:var(--purple-dark)}
 
 /* Microphone health is also described in text; colour is an extra cue. */
 .voice-stage{--signal-color:var(--purple-dark)}
-.voice-stage:is([data-voice-state=listening],[data-voice-state=interrupted],[data-voice-state=speaking]){--signal-color:#237640}
+.voice-stage:is([data-voice-state=listening],[data-voice-state=interrupted],[data-voice-state=speaking]){--signal-color:#fff;--focus:#fff;background:#237640;color:#fff}
+.app .voice-stage:is([data-voice-state=listening],[data-voice-state=interrupted],[data-voice-state=speaking]) p{color:#fff!important}
+.high-contrast .voice-stage:is([data-voice-state=listening],[data-voice-state=interrupted],[data-voice-state=speaking]){background:#14532d}
 .voice-stage[data-voice-state=error]{--signal-color:#b4232c}
 .voice-stage[data-voice-state=muted]{--signal-color:var(--muted)}
 .voice-signal>span{border-color:var(--signal-color)}

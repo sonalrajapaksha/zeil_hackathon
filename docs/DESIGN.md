@@ -28,4 +28,4 @@ Actual profile cards reveal on mount with CSS and show confirmation through a st
 
 Use shared CSS motion tokens for short interaction and discovery transitions. Animate real UI state without artificial delays. The isolated microphone observer never changes the streaming or speaker path. Reduced motion disables animations, transitions and smooth scrolling; text labels and controls remain available. Keep the pinned Boldly Human palette and Space Grotesk/Inter pairing.
 
-Microphone waveform: connected/listening/playback states use green (#237640), errors red (#b4232c), and muted/idle states remain neutral/violet. Labels communicate state independently of colour. Muting, stopping and reduced motion return the signal line to a static baseline.
+Microphone waveform: connected/listening/playback states fill the stage green (#237640) with white text and waveform, or darker green (#14532d) in high contrast, errors red (#b4232c), and muted/idle states remain neutral/violet. Labels communicate state independently of colour. Muting, stopping and reduced motion return the signal line to a static baseline.
