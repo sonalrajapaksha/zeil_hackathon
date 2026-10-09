@@ -1,6 +1,13 @@
 # Build progress / cross-model handoff
 Current milestone: M2 conversational AI; live Gemini flow verified. No ZEIL bonus requirements are verified.
 
+## Simplify welcome example controls — 2026-10-09
+
+- **PASS:** removed the “A little demonstration” label and the pause/replay controls. `HeroPreview` no longer has local interaction state; its short CSS reveal remains, and reduced-motion preferences still disable it.
+- **Changed:** `src/components/HeroPreview.tsx`, `src/app/styles.css`, `tests/redesign-browser.mjs`, `docs/DESIGN.md`, `docs/ACCESSIBILITY.md`, and `docs/ARCHITECTURE.md`.
+- **Checks:** `npm run typecheck`, `npm run build`, and `git diff --check` PASS. Browser verification is blocked because Playwright is not installed in the project.
+- **Next:** rerun the welcome redesign browser flow when the existing Playwright module is available.
+
 ## Welcome example palette alignment — 2026-10-09
 
 - **PASS:** changed the preview panel from charcoal to the site's ivory surface, with ink text, muted labels, violet accents and the existing lilac strength suggestion. Kept the story layout and adjusted the fictional badge and controls to use the same palette.

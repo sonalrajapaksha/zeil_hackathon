@@ -17,11 +17,9 @@ try {
     assert.equal(await page.getByText('How should we ask questions?', { exact: true }).count(), 0, 'Welcome has no question-style prompt');
     assert.equal(await page.getByText('Your story stays yours.', { exact: true }).count(), 0, 'Removed the welcome privacy block');
     assert.equal(await page.getByText('Fictional story', { exact: true }).count(), 1, 'Preview is clearly fictional');
+    assert.equal(await page.getByText('A little demonstration', { exact: true }).count(), 0, 'Preview has no extra heading');
+    assert.equal(await page.getByRole('button', { name: /example|replay/i }).count(), 0, 'Preview has no playback controls');
     await page.getByText('Customer assistance', { exact: true }).waitFor();
-    await page.getByRole('button', { name: 'Pause example' }).click();
-    assert.equal(await page.locator('.preview-discovery').evaluate((el) => getComputedStyle(el).animationPlayState), 'paused');
-    await page.getByRole('button', { name: 'Replay', exact: true }).click();
-    await page.waitForTimeout(950);
     assert.equal(providerRequests, 0, 'Preview never calls an API');
     assert.equal(await page.evaluate(() => window.micRequests), 0);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width}: landing reflows`);
