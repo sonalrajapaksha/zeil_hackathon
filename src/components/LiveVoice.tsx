@@ -12,10 +12,10 @@ type Resources = {
   sources: Set<AudioBufferSourceNode>; nextPlay: number;
 };
 
-export function LiveVoice({ questionStyle, available, onUseText }: {
-  questionStyle?: 'simple' | 'standard'; available: boolean; onUseText: (text: string) => void;
+export function LiveVoice({ questionStyle, available, onUseText, initiallyOpen = false }: {
+  initiallyOpen?: boolean; questionStyle?: 'simple' | 'standard'; available: boolean; onUseText: (text: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const [state, setState] = useState<'idle' | 'connecting' | 'live'>('idle');
   const [status, setStatus] = useState('Voice is off.');
   const [error, setError] = useState('');
@@ -206,10 +206,17 @@ export function LiveVoice({ questionStyle, available, onUseText }: {
     catch { stop('Voice is off.', 'Voice disconnected. Continue by text or retry.'); }
   }
 
+  const visualState = error ? 'error' : state === 'connecting' ? 'connecting' : state === 'idle' ? 'idle' : resources.current?.sources.size ? 'speaking' : muted ? 'muted' : status.startsWith('Interrupted.') ? 'interrupted' : 'listening';
+  const currentQuestion = transcript.filter((line) => line.role === 'Access · Gemini Live').at(-1)?.text;
   return <section className="live-voice" aria-labelledby="live-heading">
-    <h3 id="live-heading"><button type="button" className="text-button" aria-expanded={open} aria-controls="live-controls" onClick={() => { if (open) stop(); setOpen(!open); }}>Optional voice practice</button></h3>
+    <h3 id="live-heading"><button type="button" className="text-button" aria-expanded={open} aria-controls="live-controls" onClick={() => { if (open) stop(); setOpen(!open); }}>Voice conversation</button></h3>
     {open && <div id="live-controls">
       <p>Talk with Gemini Live and hear its replies. Starting requests microphone permission and sends audio directly to Google Gemini. Access does not record audio or save this transcript. Voice practice is separate from your text interview and career canvas.</p>
+      <div className="voice-stage" data-voice-state={visualState}>
+        <div className="voice-signal" aria-hidden="true"><span /><span /><span /><svg viewBox="0 0 240 80"><path d="M0 40 C20 40 20 40 40 40 S60 8 80 40 S100 72 120 40 S140 8 160 40 S180 40 200 40 S220 40 240 40" /></svg></div>
+        <p className="voice-state-label">{visualState === 'speaking' ? 'Access is speaking' : visualState === 'listening' ? 'Listening · microphone on' : visualState === 'interrupted' ? 'Interrupted · listening to you' : visualState === 'muted' ? 'Microphone muted' : visualState === 'connecting' ? 'Getting connected' : visualState === 'error' ? 'Let’s try again' : 'Ready when you are'}</p>
+        <p className="voice-question" tabIndex={0} aria-label="Current voice turn">{currentQuestion || 'Your experiences matter. Let’s discover what they mean.'}</p>
+      </div>
       <p role="status">{status}</p>
       {error && <p role="alert">{error}</p>}
       <div className="live-actions">
@@ -218,7 +225,7 @@ export function LiveVoice({ questionStyle, available, onUseText }: {
         <button type="button" className="text-button" disabled={!active} onClick={() => { stop(); startButton.current?.focus(); }}>Stop voice</button>
       </div>
       {state === 'live' && <div className="live-actions"><button type="button" className="text-button" onClick={() => command('Skip this voice question and ask about a different work-related topic.')}>Skip voice question</button><button type="button" className="text-button" onClick={() => command('Please clarify the current voice question, then restate it. This is not a career answer.')}>Clarify voice question</button></div>}
-      {transcript.length > 0 && <div className="live-transcript" role="region" tabIndex={0} aria-label="Voice practice transcript"><p>Automatic transcript — check for mistakes before using an answer.</p>{transcript.map((line, index) => <div key={index}><strong>{line.role}</strong><p>{line.text}</p>{line.role === 'You' && <button type="button" className="text-button" onClick={() => { stop(); onUseText(line.text); }}>Review this answer in text</button>}</div>)}</div>}
+      {transcript.length > 0 && <details className="transcript-disclosure" open><summary>Live transcript · {transcript.length} turns</summary><div className="live-transcript" role="region" tabIndex={0} aria-label="Voice practice transcript"><p>Automatic transcript · text may still be arriving. Check for mistakes before using an answer.</p>{transcript.map((line, index) => <div key={index}><strong>{line.role}</strong><p>{line.text}</p>{line.role === 'You' && <button type="button" className="text-button" onClick={() => { stop(); onUseText(line.text); }}>Review this answer in text</button>}</div>)}</div></details>}
       <p>You can stop and use the text controls below at any time. Voice answers are never added to your profile automatically.</p>
     </div>}
   </section>;

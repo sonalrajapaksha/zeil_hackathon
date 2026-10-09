@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { HeroPreview } from "@/components/HeroPreview";
 import { LiveVoice } from "@/components/LiveVoice";
 import { DEMO_JOBS } from "@/lib/jobs";
 import { ApplicationErrorSchema, ApplicationPackageSchema, CLARIFICATION_REQUEST, ConversationErrorSchema, ConversationResponseSchema, CvImportErrorSchema, CvImportResponseSchema, type ApplicationPackage, type CandidateProfile, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
@@ -18,7 +19,14 @@ function Mark({ small = false }: { small?: boolean }) {
 }
 
 export default function Home() {
+  const [voiceFirst, setVoiceFirst] = useState(false);
   const [step, setStep] = useState<Step>("welcome");
+  const previousStep = useRef(step);
+  useEffect(() => {
+    if (previousStep.current === step) return;
+    previousStep.current = step;
+    document.getElementById("main-content")?.focus();
+  }, [step]);
   const [profile, setProfile] = useState<CandidateProfile>(emptyProfile);
   const [storageReady, setStorageReady] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"conversation" | "canvas">("conversation");
@@ -334,7 +342,7 @@ export default function Home() {
     activeRequest.current?.abort(); activeRequest.current = null;
     activeCvImport.current?.abort(); activeCvImport.current = null; setCvImportPending(false); setCvImportError("");
     setPending(false); setError(""); setFailedRequest(null); setCorrectionId(null); setInterview(EMPTY_INTERVIEW);
-    setStep("welcome"); setChat([]); setProfile(emptyProfile()); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setMobilePanel("conversation"); setCv(""); setLetter(""); setDraftJobId(null); setUnverifiedClaims([]); setApplicationError(""); setAnnouncement("Your session has been reset.");
+    setVoiceFirst(false); setStep("welcome"); setChat([]); setProfile(emptyProfile()); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setMobilePanel("conversation"); setCv(""); setLetter(""); setDraftJobId(null); setUnverifiedClaims([]); setApplicationError(""); setAnnouncement("Your session has been reset.");
   }
 
   return (
@@ -372,9 +380,8 @@ export default function Home() {
       <div id="main-content" tabIndex={-1}>
         {step === "welcome" && <section className="welcome" aria-labelledby="welcome-heading">
           <div className="welcome-copy">
-            <p className="eyebrow"><span className="eyebrow-line" /> YOUR NEXT CHAPTER, ON YOUR TERMS</p>
-            <h1 id="welcome-heading">Your experience<br />is <span>more than</span><br />a résumé.</h1>
-            <p className="welcome-intro">Accessibility-first career support for everyone. Tell your story by text, choose how we word questions, then shape an application that sounds like you.</p>
+            <h1 id="welcome-heading"><span>Your experience.</span><span>Your future.</span></h1>
+            <p className="welcome-intro">Talk naturally with Access. Discover the skills behind your experiences. Accessibility-first career support for everyone, with a complete text alternative.</p>
             <p className="welcome-friction">Instead of repeating your work history across long application forms, describe it once, review each detail, and reuse only what you confirm in an editable draft.</p>
             <fieldset className="question-style welcome-style" aria-describedby="question-style-help"><legend>How should we ask questions?</legend>
               <div className="question-style-choice">
@@ -383,28 +390,21 @@ export default function Home() {
               </div>
               <p id="question-style-help">Choose one to begin. You can change this preference at any time.</p>
             </fieldset>
-            <button className="button button-primary button-large" onClick={begin} disabled={!profile.preferences.questionStyle}>Start your interview <span aria-hidden="true">↗</span></button>
-            <p className="sample-note"><span className="sample-dot" /> Text interview · you control what you share</p>
+            <div className="welcome-actions"><button className="button button-primary button-large" onClick={() => { setVoiceFirst(true); setStep("story"); setAnnouncement("Voice is off. Read the voice information, then explicitly start your microphone when ready."); }} disabled={!profile.preferences.questionStyle}>Start a conversation</button><button className="text-button" onClick={() => { setVoiceFirst(false); begin(); }} disabled={!profile.preferences.questionStyle}>I’d rather type</button></div><p className="sample-note">You choose when the microphone starts. Every suggestion is yours to review.</p>
           </div>
-          <div className="welcome-art" aria-label="Illustration of a growing career story">
-            <div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" />
-            <div className="art-note note-top"><span className="note-spark" aria-hidden="true">✳</span><span>what you bring</span></div>
-            <div className="art-center"><span className="art-flower" aria-hidden="true"><i /><i /><i /><i /><i /><b /></span><span className="art-center-label">your story,<br />taking shape</span></div>
-            <div className="art-note note-bottom"><span className="note-check" aria-hidden="true">✓</span><span>on your terms</span></div>
-            <span className="art-caption">A different way<br />to begin.</span>
-          </div>
+          <HeroPreview />
           <div className="welcome-footer"><div><span className="footer-icon">01</span><span>Start with what you’ve done</span></div><div><span className="footer-icon">02</span><span>Review every suggestion</span></div><div><span className="footer-icon">03</span><span>Keep the final say</span></div></div>
           <aside className="privacy-note"><span aria-hidden="true">◌</span><p><strong>Your story stays yours.</strong> Your interview text is sent to Google Gemini to generate questions. Access saves confirmed profile details, their short source evidence, and your chosen preferences on this device. Full conversation history and unapproved suggestions stay in memory only. Reset &amp; delete removes saved details. Nothing is sent to an employer.</p></aside>
         </section>}
 
         {step === "story" && <section className="workspace" aria-labelledby="story-heading">
-          <div className="workspace-heading"><div><p className="eyebrow"><span className="eyebrow-line" /> YOUR STORY</p><h1 id="story-heading">Let’s start with what you know.</h1><p>Write the way you’d tell a friend. We’ll help you find the words for your experience.</p></div><span className="demo-tag"><span /> Gemini interview</span></div>
+          <div className="workspace-heading"><div><h1 id="story-heading">Your story, taking shape.</h1><p>Speak or write in your own words. Review what you discover, at your own pace.</p></div><span className="demo-tag"><span /> Gemini interview</span></div>
           <div className="mobile-switch" role="group" aria-label="Workspace panel"><button aria-pressed={mobilePanel === "conversation"} onClick={() => setMobilePanel("conversation")}>Conversation</button><button aria-pressed={mobilePanel === "canvas"} onClick={() => setMobilePanel("canvas")}>Career canvas <span className="count-pill">{claims.length}</span></button></div>
           <div className="workspace-grid">
             <section className={`conversation-pane${mobilePanel === "canvas" ? " mobile-hidden" : ""}`} aria-labelledby="conversation-heading">
               <div className="pane-heading"><div><h2 id="conversation-heading">In your words</h2></div></div>
-              <LiveVoice questionStyle={profile.preferences.questionStyle} available={!pending && mobilePanel === "conversation"} onUseText={reviewVoiceAnswer} />
-              <div ref={chatLog} className="chat-log" role="region" tabIndex={0} aria-label="Conversation history" aria-busy={pending}>
+              <LiveVoice initiallyOpen={voiceFirst} questionStyle={profile.preferences.questionStyle} available={!pending && mobilePanel === "conversation"} onUseText={reviewVoiceAnswer} />
+              <div ref={chatLog} className={`chat-log${!chat.length ? " is-empty" : ""}`} role="region" tabIndex={chat.length ? 0 : -1} aria-label="Conversation history" aria-busy={pending}>
                 {chat.map((line) => <div key={line.id} className={`chat-line ${line.role === "user" ? "you" : "access"}`}><div className="avatar" aria-hidden="true">{line.role === "user" ? (profile.name?.[0] || "Y") : <Mark small />}</div><div><span className="speaker">{line.role === "user" ? "You" : "Access · Gemini"}</span><p>{line.content === CLARIFICATION_REQUEST ? "Could you clarify this question?" : line.content}</p>{line.role === "user" && !["[Question skipped by candidate]", CLARIFICATION_REQUEST].includes(line.content) && <button className="text-button" disabled={pending || interview.status === "ended"} onClick={() => { setCorrectionId(line.id); setMessage(line.content); setError(""); setFailedRequest(null); messageInput.current?.focus(); }}>Correct this answer</button>}</div></div>)}
               </div>
               <p className="interview-status" role="status">{pending ? "Access is preparing a question…" : interview.status === "ended" ? "Interview ended. Your history is available above." : chat.length ? `Question ${interview.questions} of up to ${interview.limit} · ${interview.answered} answered` : "Start the interview to receive your first question."}</p>
@@ -432,7 +432,7 @@ export default function Home() {
                 {!claims.length && <li>Add something yourself or continue your interview to see grounded suggestions here.</li>}
                 {claims.map((claim) => <li key={`${claim.kind}-${claim.id}`} className={`note-item ${claim.confirmed ? "confirmed" : "pending"}`}>
                   <span className="note-status" aria-label={claim.confirmed ? "Confirmed" : "Needs your review"}>{claim.confirmed ? "✓" : "· · ·"}</span>
-                  <div className="claim-content"><span className="claim-kind">{claim.kind}</span><label className="sr-only" htmlFor={`note-${claim.id}`}>{claim.confirmed ? "Confirmed" : "Suggested"} {claim.kind}</label><input id={`note-${claim.id}`} value={claim.text} onChange={(event) => updateClaim(claim.kind, claim.id, event.target.value)} /><p className="claim-evidence"><strong>From your answer:</strong> “{claim.evidence}”</p></div>
+                  <div className="claim-content"><span className="claim-kind">{claim.kind} · {claim.confirmed ? "confirmed by you" : "discovered, awaiting review"}</span><label className="sr-only" htmlFor={`note-${claim.id}`}>{claim.confirmed ? "Confirmed" : "Suggested"} {claim.kind}</label><input id={`note-${claim.id}`} value={claim.text} onChange={(event) => updateClaim(claim.kind, claim.id, event.target.value)} /><p className="claim-evidence"><strong>What you did → what it demonstrates:</strong> “{claim.evidence}”</p></div>
                   {!claim.confirmed ? <div className="note-actions"><button className="icon-action accept" onClick={() => confirmClaim(claim.kind, claim.id)}>Approve</button><button className="icon-action" onClick={() => removeClaim(claim.kind, claim.id)}>Remove</button></div> : <span className="confirmed-label">Confirmed</span>}
                 </li>)}
               </ul>
@@ -445,7 +445,7 @@ export default function Home() {
         </section>}
 
         {step === "application" && <section className="application" aria-labelledby="application-heading">
-          <div className="application-heading"><div><p className="eyebrow"><span className="eyebrow-line" /> YOUR NEXT STEP</p><h1 id="application-heading">A draft you can make your own.</h1><p>Choose a fictional role. We’ll shape a starting point from the details you’ve confirmed.</p></div><span className="demo-tag"><span /> Fictional roles</span></div>
+          <div className="application-heading"><div><h1 id="application-heading">A draft you can make your own.</h1><p>Choose a fictional role. We’ll shape a starting point from the details you’ve confirmed.</p></div><span className="demo-tag"><span /> Fictional roles</span></div>
           <div className="job-layout"><section className="job-column" aria-labelledby="jobs-heading"><div className="section-title-row"><h2 id="jobs-heading">Choose a role</h2><span>3 sample listings</span></div><div className="job-list">{DEMO_JOBS.map((job, index) => <button key={job.id} className={`job-option${selectedJob === job.id ? " selected" : ""}`} aria-pressed={selectedJob === job.id} onClick={() => { setSelectedJob(job.id); setApplicationError(""); }}><span className={`job-symbol job-symbol-${index}`} aria-hidden="true">{["↗", "⌁", "＋"][index]}</span><span className="job-main"><strong>{job.title}</strong><span>{job.company} · {job.location}</span><small>{job.arrangement} <i>·</i> Fictional listing</small></span><span className="job-radio" aria-hidden="true">{selectedJob === job.id ? "✓" : ""}</span></button>)}</div><div className="job-description"><span className="small-label">ROLE SNAPSHOT</span><h3>{selected.title}</h3><p>{selected.description}</p><ul>{selected.requirements.map((requirement) => <li key={requirement}>{requirement}</li>)}</ul></div><button className="button button-primary generate-button" onClick={generateDraft} disabled={applicationPending}>{applicationPending ? "Preparing your draft…" : "Prepare application draft"} <span aria-hidden="true">↗</span></button><p className="no-submit"><span aria-hidden="true">◎</span> This only prepares a draft. It never applies or contacts an employer.</p>{applicationError && <div className="application-error" role="alert"><p>{applicationError}</p><button className="text-button" onClick={generateDraft} disabled={applicationPending}>Retry draft</button></div>}</section>
             <section className="draft-column" aria-labelledby="draft-heading" aria-busy={applicationPending}><div className="draft-header"><div><span className="pane-index">C</span><div><h2 id="draft-heading">Your application draft</h2><p>{cv ? draftJobId === selectedJob ? "Ready for your review" : `Current draft: ${DEMO_JOBS.find((job) => job.id === draftJobId)?.title ?? "previous role"}` : "Your preview will appear here"}</p></div></div>{cv && <span className="draft-status"><i /> EDITABLE</span>}</div>{applicationPending && <p className="application-progress" role="status">Preparing your draft. Your existing text stays available while this runs.</p>}{cv ? <><div className="draft-editors"><div className="editor-block"><label htmlFor="cv-text">Curriculum vitae</label><textarea id="cv-text" value={cv} onChange={(event) => setCv(event.target.value)} rows={13} /></div><div className="editor-block"><label htmlFor="letter-text">Cover letter</label><textarea id="letter-text" value={letter} onChange={(event) => setLetter(event.target.value)} rows={12} /></div></div>{unverifiedClaims.length > 0 && <aside className="unverified-note" aria-labelledby="unverified-heading"><h3 id="unverified-heading">Details to check</h3><p>These details were uncertain, so Access left them out of your draft:</p><ul>{unverifiedClaims.map((claim, index) => <li key={`${index}-${claim}`}>{claim}</li>)}</ul></aside>}<div className="draft-actions"><p>Made from confirmed, work-related details. Read it through and change anything you like.</p><div className="export-actions"><button className="button button-dark" onClick={() => downloadText(cv, `access-${draftJobId ?? selected.id}-cv.txt`, "Your CV")}>Download CV (.txt) <span aria-hidden="true">↓</span></button><button className="button button-dark" onClick={() => downloadText(letter, `access-${draftJobId ?? selected.id}-cover-letter.txt`, "Your cover letter")}>Download cover letter (.txt) <span aria-hidden="true">↓</span></button></div></div></> : <div className="empty-draft"><div className="empty-mark" aria-hidden="true"><span>✳</span><i /><b /></div><h3>Your story will come through here.</h3><p>Prepare an application draft from the work-related details you have confirmed. You can edit every word before you download it.</p><span className="empty-rule" /></div>}</section></div>
           <button className="back-link" onClick={() => setStep("story")}>← Back to your story</button>

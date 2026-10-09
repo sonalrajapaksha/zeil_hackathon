@@ -34,3 +34,13 @@ Also test:
 - If voice is implemented, microphone permission, denial, stop/mute, failure recovery, and completion using text alone.
 
 Record exact test conditions, outcomes, and known gaps. Automated scans and passing tests do not by themselves establish WCAG conformance.
+
+## Voice-first redesign — 2026-10-09
+
+“Start a conversation” opens the voice information and controls without requesting microphone permission or starting a text API call. “I’d rather type” starts the existing complete text journey. Voice starts only through “Start voice & allow microphone”; mute, stop, skip, clarification and retry remain explicit controls. Voice is optional practice, separate from text extraction. “Review this answer in text” stops voice and places a bounded answer in the text field for correction and explicit submission; it never approves a claim.
+
+The visual signal is decorative (`aria-hidden`), paired with readable state text and concise status/error announcements. The native transcript disclosure has speaker labels and a keyboard-focusable scroll region. Streaming transcript tokens are not a live region and do not force scroll or move keyboard focus. Stopping returns focus to the start control; transferring an answer focuses the text field. Existing mobile panel controls, high contrast, large text, simple/standard questions and preference persistence remain in place.
+
+System and application reduced-motion settings stop the landing preview, signal and card animation; preview motion controls are hidden when motion is disabled. Pause/play and replay are available otherwise. Fictional preview content is explicitly labelled and carries no microphone or provider activity.
+
+Verification reported by the integrator: baseline/final 29 unit tests, typecheck and production build PASS; text browser flow at 320/640/1280px PASS; synthetic Live browser flow at 1440/1024/768/390/320px PASS. Genuine-provider ephemeral token, WebSocket and native PCM reply PASS. Synthetic audio and provider output do not establish human microphone turn-taking or heard playback quality. Manual VoiceOver/NVDA and actual 200% browser zoom remain unverified; 640px reflow is not a zoom test. Final preview/consent/reflow checks passed at all five requested widths; screenshots and the independent spacing-fix verdict are recorded in `docs/PROGRESS.md`. No WCAG certification or full Live bonus verification is claimed.

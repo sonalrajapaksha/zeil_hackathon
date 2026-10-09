@@ -4,7 +4,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const browser = await chromium.launch({ headless: true, args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
 const baseURL = process.env.ACCESS_TEST_URL || 'http://localhost:3013';
 try {
-  for (const width of [1280, 320]) {
+  for (const width of [1440, 1024, 768, 390, 320]) {
     const page = await browser.newPage({ viewport: { width, height: 1000 }, reducedMotion: 'reduce' });
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -42,8 +42,8 @@ try {
     });
     await page.goto(baseURL);
     await page.getByRole('radio', { name: /Simple/ }).check();
-    await page.getByRole('button', { name: 'Start your interview' }).click();
-    await page.getByRole('button', { name: 'Optional voice practice' }).focus(); await page.keyboard.press('Enter');
+    await page.getByRole('button', { name: 'I’d rather type' }).click();
+    await page.getByRole('button', { name: 'Voice conversation' }).focus(); await page.keyboard.press('Enter');
     const start = page.getByRole('button', { name: 'Start voice & allow microphone' });
     await page.locator('#message').fill('My unsent answer stays here.');
     // Denial preserves candidate input and allows immediate text fallback.
@@ -62,7 +62,12 @@ try {
     await page.waitForFunction(() => !document.querySelector('.live-actions button[aria-pressed]').disabled);
     for (let attempt = 0; attempt < 50 && !messages.some((message) => message.realtimeInput?.audio); attempt++) await page.waitForTimeout(100);
     assert.ok(messages.some((message) => message.realtimeInput?.audio?.mimeType.startsWith('audio/pcm;rate=')), 'microphone frames use realtimeInput');
+    await page.locator('.voice-stage[data-voice-state="listening"]').waitFor();
+    const sessionCount = messages.filter((message) => message.setup).length;
+    await start.evaluate((el) => el.click());
+    assert.equal(messages.filter((message) => message.setup).length, sessionCount, 'Disabled start never duplicates the session');
     await page.getByRole('button', { name: 'Mute microphone', exact: true }).click();
+    await page.locator('.voice-stage[data-voice-state="muted"]').waitFor();
     assert.ok(await page.evaluate(() => window.liveTracks.filter((track) => track.readyState === 'live').every((track) => !track.enabled)));
     assert.ok(messages.some((message) => message.realtimeInput?.audioStreamEnd));
     await page.getByRole('button', { name: 'Unmute microphone' }).click();
@@ -75,10 +80,19 @@ try {
     socket.send(JSON.stringify({ serverContent: { inputTranscription: { text: 'I helped library visitors.' }, outputTranscription: { text: 'What did you enjoy?' }, modelTurn: { parts: [{ inlineData: { data: pcm, mimeType: 'audio/pcm;rate=24000' } }] } } }));
     await page.getByText('I helped library visitors.', { exact: true }).waitFor();
     await page.waitForFunction(() => window.playedAudio > 0);
+    await page.locator('.voice-stage[data-voice-state="speaking"]').waitFor();
+    await page.screenshot({ path: `/tmp/access-redesign-speaking-${width}.png`, fullPage: true });
     socket.send(JSON.stringify({ serverContent: { interrupted: true } }));
     await page.waitForFunction(() => window.stoppedAudio > 0);
+    await page.locator('.voice-stage[data-voice-state="interrupted"]').waitFor();
     await page.screenshot({ path: `/tmp/access-task13-${width}.png`, fullPage: true });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
+    await page.getByRole('region', { name: 'Voice practice transcript' }).focus();
+    socket.send(JSON.stringify({ serverContent: { outputTranscription: { text: ' Here is more context.'.repeat(100) }, turnComplete: true } }));
+    await page.waitForFunction(() => document.querySelector('.voice-question').textContent.length > 1000);
+    assert.equal(await page.getByRole('region', { name: 'Voice practice transcript' }).evaluate((el) => el === document.activeElement), true, 'Streaming preserves transcript focus');
+    assert.equal(await page.getByRole('region', { name: 'Voice practice transcript' }).getAttribute('aria-live'), null, 'Partial transcripts do not flood announcements');
+    assert.equal(await page.locator('.voice-question').evaluate((el) => el.clientHeight < el.scrollHeight), true, 'Long current turn scrolls without displacing stop controls');
     await page.getByRole('button', { name: 'Review this answer in text' }).click();
     assert.equal(await page.locator('#message').inputValue(), 'My unsent answer stays here.\n\nI helped library visitors.');
     assert.equal(await page.locator('#message').evaluate((el) => el === document.activeElement), true);
