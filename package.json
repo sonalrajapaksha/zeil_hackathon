@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts",
     "test:gemini": "node --env-file-if-exists=.env --env-file-if-exists=.env.local tests/gemini-smoke.ts",
-    "test:browser": "node tests/browser-smoke.mjs"
+    "test:browser": "node tests/browser-smoke.mjs",
+    "test:live-browser": "node tests/live-browser.mjs",
+    "test:live-gemini": "node --env-file-if-exists=.env --env-file-if-exists=.env.local tests/live-gemini-smoke.ts"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",

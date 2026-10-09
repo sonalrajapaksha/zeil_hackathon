@@ -68,3 +68,15 @@ input,textarea{caret-color:var(--purple-dark)}
 /* High contrast also covers copy that uses fixed muted colors in the base theme. */
 .high-contrast :is(p,small,.speaker,.small-label,.section-label,.claim-kind,.claim-evidence,.demo-disclaimer,.interview-status,.canvas-footnote,.no-submit,.job-main>span,.job-main small,.job-description p,.privacy-note p,.workspace-heading>div>p,.application-heading>div>p,.empty-draft p,.draft-actions p,.site-footer){color:#000!important}
 @media(max-width:360px){.large-text .question-style-choice{grid-template-columns:1fr}}
+
+/* Optional Live practice uses the existing text controls and editorial rules. */
+.live-voice { border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 20px; }
+.live-voice h3 { margin: 0; font-size: 1rem; }
+.live-voice p { font-size: 1em; line-height: 1.5; }
+.live-actions { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.live-actions .button { white-space: normal; }
+.live-transcript { max-height: 280px; overflow-y: auto; padding: 12px 0; }
+.live-transcript > div { border-top: 1px solid var(--line); padding: 12px 0; overflow-wrap: anywhere; }
+.live-transcript p { margin: 4px 0 8px; }
+
+.live-voice .text-button { min-height: 44px; font-size: 1em; }

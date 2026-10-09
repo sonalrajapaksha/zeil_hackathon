@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { LiveVoice } from "@/components/LiveVoice";
 import { DEMO_JOBS } from "@/lib/jobs";
 import { ApplicationErrorSchema, ApplicationPackageSchema, CLARIFICATION_REQUEST, ConversationErrorSchema, ConversationResponseSchema, CvImportErrorSchema, CvImportResponseSchema, type ApplicationPackage, type CandidateProfile, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
 import { EMPTY_INTERVIEW, progress } from "@/lib/interview";
@@ -315,6 +316,18 @@ export default function Home() {
     setAnnouncement(`${label} downloaded as ${filename}.`);
   }
 
+  function reviewVoiceAnswer(text: string) {
+    const combined = [message.trim(), text].filter(Boolean).join("\n\n");
+    if (combined.length > 4000) {
+      setAnnouncement("There is not enough space in the text field. Shorten your current answer before adding this voice answer.");
+      messageInput.current?.focus();
+      return;
+    }
+    setMessage(combined); setCorrectionId(null); setError(""); setFailedRequest(null);
+    setAnnouncement("Voice answer added to your text field. Review it before sending.");
+    messageInput.current?.focus();
+  }
+
   function reset() {
     deleteSavedProfile();
     skipNextPersist.current = true;
@@ -390,6 +403,7 @@ export default function Home() {
           <div className="workspace-grid">
             <section className={`conversation-pane${mobilePanel === "canvas" ? " mobile-hidden" : ""}`} aria-labelledby="conversation-heading">
               <div className="pane-heading"><div><h2 id="conversation-heading">In your words</h2></div></div>
+              <LiveVoice questionStyle={profile.preferences.questionStyle} available={!pending && mobilePanel === "conversation"} onUseText={reviewVoiceAnswer} />
               <div ref={chatLog} className="chat-log" role="region" tabIndex={0} aria-label="Conversation history" aria-busy={pending}>
                 {chat.map((line) => <div key={line.id} className={`chat-line ${line.role === "user" ? "you" : "access"}`}><div className="avatar" aria-hidden="true">{line.role === "user" ? (profile.name?.[0] || "Y") : <Mark small />}</div><div><span className="speaker">{line.role === "user" ? "You" : "Access · Gemini"}</span><p>{line.content === CLARIFICATION_REQUEST ? "Could you clarify this question?" : line.content}</p>{line.role === "user" && !["[Question skipped by candidate]", CLARIFICATION_REQUEST].includes(line.content) && <button className="text-button" disabled={pending || interview.status === "ended"} onClick={() => { setCorrectionId(line.id); setMessage(line.content); setError(""); setFailedRequest(null); messageInput.current?.focus(); }}>Correct this answer</button>}</div></div>)}
               </div>
