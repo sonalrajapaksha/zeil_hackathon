@@ -214,5 +214,35 @@ input,textarea{caret-color:var(--purple-dark)}
 .large-text .welcome-privacy{font-size:.9em}
 .high-contrast .welcome-privacy{color:#000}
 .large-text .welcome-intro{font-size:1em}
+
+/* The fictional welcome example is a self-contained story, not a live interview. */
+.hero-preview{align-self:center;padding:clamp(20px,2.5vw,36px);border:1px solid var(--line);border-radius:18px;background:var(--white);color:var(--ink);animation:none}
+.preview-heading{gap:8px 12px;color:var(--muted);font-size:14px}
+.preview-heading>span:first-child{flex:1;text-transform:uppercase;font-size:14px;font-weight:500;letter-spacing:.015em}
+.preview-heading .preview-fictional{flex:0 0 auto;padding:3px 11px;border-radius:999px;background:var(--purple-wash);color:var(--purple-dark);font-size:13px;font-weight:600}
+.preview-heading .text-button{color:var(--muted)}
+.preview-heading .text-button:hover{color:var(--purple-dark)}
+.preview-scene{display:block;padding:28px 0 0}
+.preview-conversation>span{display:block;color:var(--muted);text-transform:uppercase;font-size:14px;font-weight:500;letter-spacing:.015em}
+.preview-conversation>p{max-width:38ch;margin:7px 0 22px;color:var(--ink);font-size:clamp(19px,2.1vw,27px);font-weight:600;line-height:1.3}
+.preview-conversation blockquote{position:relative;margin:8px 0 0;color:var(--ink);font:italic 600 clamp(20px,2.15vw,29px)/1.35 var(--display);letter-spacing:-.02em}
+.preview-conversation blockquote::before{content:'“';color:var(--purple);margin-right:4px}
+.preview-story-cue{display:flex;align-items:center;justify-content:center;gap:12px;margin:24px 0 22px;color:var(--muted);font-size:15px}
+.preview-story-cue span{color:var(--purple);font-size:20px;font-weight:700}
+.preview-discovery{position:relative;display:flex;flex-direction:column;gap:12px;padding:22px 20px;border:0;border-radius:14px;background:var(--purple-wash);animation:discovery-in 500ms var(--motion-ease) both;animation-delay:250ms}
+.preview-discovery>span{color:#5632c2;text-transform:uppercase;font-size:14px;font-weight:600;letter-spacing:.015em}
+.preview-discovery strong{color:#211a2d;font:600 clamp(21px,2.1vw,28px)/1.2 var(--display)}
+.preview-discovery p{margin:0;color:#4e465b;font-size:16px;line-height:1.5}
+.preview-caption{display:block;margin:16px 0 0;color:var(--muted);text-align:center;font-size:14px}
+.high-contrast .hero-preview{border:2px solid #000;background:#fff;color:#000}
+.high-contrast .preview-heading,.high-contrast .preview-heading .text-button,.high-contrast .preview-conversation>span,.high-contrast .preview-story-cue,.high-contrast .preview-caption{color:#29252f}
+.high-contrast .preview-heading .preview-fictional{background:#e5e5e5;color:#000}
+.high-contrast .preview-conversation>p,.high-contrast .preview-conversation blockquote{color:#000}
+.high-contrast .preview-discovery{border:1px solid #000;background:#fff}
+.high-contrast .preview-discovery>span,.high-contrast .preview-discovery strong,.high-contrast .preview-discovery p{color:#000}
+.large-text .preview-conversation>span,.large-text .preview-heading>span:first-child,.large-text .preview-heading .preview-fictional,.large-text .preview-discovery>span,.large-text .preview-caption{font-size:1em}
+.large-text .preview-discovery p{font-size:1em}
+@media(max-width:800px){.preview-scene{padding-top:24px}.preview-conversation blockquote{font-size:clamp(21px,4vw,29px)}}
+@media(max-width:650px){.hero-preview{padding:20px 18px;border-radius:14px}.preview-heading>span:first-child{flex-basis:calc(100% - 130px)}.preview-heading .preview-fictional{margin-left:auto}.preview-conversation>p{font-size:21px}.preview-discovery{padding:18px 16px}.preview-story-cue{margin:20px 0;font-size:14px}}
 @media(max-width:1024px){.workspace-grid{grid-template-columns:minmax(0,1.5fr) minmax(240px,1fr);gap:24px}}
 @media(max-width:650px){.workspace{padding-top:30px}.workspace-heading{margin-bottom:14px}.workspace-heading h1{font-size:clamp(36px,9vw,48px)}.workspace-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:22px}.canvas-companion{width:100%}.canvas-companion>summary{padding:14px 0}.canvas-companion[open] .canvas-pane{padding-top:16px}.interview-mode{margin-bottom:12px}.interview-mode>div{width:auto}.interview-mode label{flex:0 1 140px}.live-actions .button{width:auto}.voice-stage{padding:22px 16px}}

@@ -20,7 +20,7 @@ Impeccable workflow: context/init once; run bounded desktop+mobile critique and 
 
 ## Voice-first components and motion
 
-The welcome pairs an editorial headline with `HeroPreview`, a visibly fictional, CSS-only conversation and discovery example. Its arrows connect written example labels (“What you did → What it demonstrates → Where it applies”); they are not realtime extraction or job matching. Pause/play and replay are real buttons. Both system and Access reduced-motion settings render the example statically and hide its motion controls.
+The welcome pairs an editorial headline with `HeroPreview`, a visibly fictional, CSS-only conversation and discovery example. An ivory story panel presents one answer, a cue that invites the viewer to imagine its fuller context, and a lilac strength suggestion; it does not imply realtime extraction or job matching. Pause/play and replay are real buttons. Both system and Access reduced-motion settings render the example statically and hide its motion controls.
 
 The live stage uses concentric CSS rings and a decorative SVG signal with a readable state label. States come from the existing session lifecycle, playback sources, mute, interruption and errors. Ring motion represents state; the signal line observes actual microphone samples through a passive analyser branch at up to 20 updates per second. It does not infer candidate speech or model thinking. Idle, mute and errors are static; listening, connection and playback have distinct restrained treatments. Voice body copy is 16px; the current Gemini transcript text is prominent. Native transcript disclosure and a bounded scroll region keep review within the conversation. An empty text history takes no reserved chat space.
 

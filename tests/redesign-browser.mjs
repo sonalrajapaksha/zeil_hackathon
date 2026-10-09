@@ -16,8 +16,10 @@ try {
     await page.getByRole('heading', { name: /Your experience\.\s*Your future\./ }).waitFor();
     assert.equal(await page.getByText('How should we ask questions?', { exact: true }).count(), 0, 'Welcome has no question-style prompt');
     assert.equal(await page.getByText('Your story stays yours.', { exact: true }).count(), 0, 'Removed the welcome privacy block');
+    assert.equal(await page.getByText('Fictional story', { exact: true }).count(), 1, 'Preview is clearly fictional');
+    await page.getByText('Customer assistance', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Pause example' }).click();
-    assert.equal(await page.locator('.preview-discovery p:nth-of-type(2)').evaluate((el) => getComputedStyle(el).animationPlayState), 'paused');
+    assert.equal(await page.locator('.preview-discovery').evaluate((el) => getComputedStyle(el).animationPlayState), 'paused');
     await page.getByRole('button', { name: 'Replay', exact: true }).click();
     await page.waitForTimeout(950);
     assert.equal(providerRequests, 0, 'Preview never calls an API');

@@ -1,6 +1,27 @@
 # Build progress / cross-model handoff
 Current milestone: M2 conversational AI; live Gemini flow verified. No ZEIL bonus requirements are verified.
 
+## Welcome example palette alignment — 2026-10-09
+
+- **PASS:** changed the preview panel from charcoal to the site's ivory surface, with ink text, muted labels, violet accents and the existing lilac strength suggestion. Kept the story layout and adjusted the fictional badge and controls to use the same palette.
+- **Changed:** `src/app/styles.css`, `docs/DESIGN.md`, and this log.
+- **Checks:** `npm run typecheck`, `npm run build`, and `git diff --check` PASS. Browser flow remains unavailable because Playwright is not installed in the project.
+- **Next:** rerun the welcome redesign browser flow when the existing Playwright module is available.
+
+## Project README refresh — 2026-10-09
+
+- **PASS:** replaced the original starter-scaffold README with a current project guide covering the candidate journey, Mermaid flow and architecture diagrams, API responsibilities, local state/privacy boundaries, local setup, available scripts, repository map, documentation index, and known limitations. Kept deployment, accessibility, and bonus claims aligned with the recorded evidence.
+- **Changed:** `README.md` and this progress entry.
+- **Checks:** `npm run typecheck` PASS; `npm run build` PASS. No tests run for this documentation-only change.
+- **Next:** no README follow-up identified; deployment and the documented manual accessibility/Live checks remain separate outstanding work.
+
+## Welcome example restyle — 2026-10-09
+
+- **PASS:** reshaped the front-page fictional example to match the supplied reference: charcoal story panel, clear fictional label, question and quote, story cue, and lilac “Customer assistance” strength suggestion with candidate control language. Kept pause/replay and added reduced-motion/high-contrast/large-text styling.
+- **Changed:** `src/components/HeroPreview.tsx`, `src/app/styles.css`, `docs/DESIGN.md`, and the existing preview assertions in `tests/redesign-browser.mjs`.
+- **Checks:** `npm run typecheck`, `npm run build`, and `git diff --check` PASS. Impeccable detector reported the existing DESIGN.md-pinned Inter/Space Grotesk font warning. Browser flow could not run because Playwright is not installed in the project and no `PLAYWRIGHT_MODULE` path was available.
+- **Next:** rerun the welcome redesign browser flow when the existing Playwright module is available; no dependency was added for this visual change.
+
 ## Quieter welcome page — 2026-10-09
 
 - **PASS:** reduced welcome-page clutter while keeping the current visual identity and all controls. Consolidated the intro into one benefit statement, removed the repeated footer steps while retaining the journey navigation, compacted the required Simple/Standard choices, and flattened the fictional conversation preview into a readable evidence-to-strength list. Pause/replay remain available and still control the strength reveal; accessibility preferences, voice/text actions, consent, privacy details, and profile review language remain present.
