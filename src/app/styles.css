@@ -181,5 +181,38 @@ input,textarea{caret-color:var(--purple-dark)}
 .high-contrast .canvas-summary-review.has-review,.high-contrast .canvas-summary-action{color:#000;text-decoration:underline}
 .large-text .canvas-summary-title{font-size:1.15em}
 .large-text .canvas-summary-counts,.large-text .canvas-summary-review,.large-text .canvas-summary-latest{font-size:1em}
+
+/* Welcome: keep the two required wording choices visible while reducing their visual weight. */
+.welcome-copy{padding-bottom:20px}
+.welcome-intro{max-width:54ch;margin-bottom:22px}
+.welcome-privacy{max-width:58ch;margin:8px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
+.welcome-style{max-width:470px;margin:0 0 14px}
+.question-style-choice label{min-height:48px;align-items:center;padding:8px 10px;background:transparent}
+.question-style-choice label.is-selected{background:var(--purple-wash)}
+.question-style-choice span{gap:0}
+.question-style-choice strong{font-size:14px}
+.question-style-choice small{font-size:12px}
+.question-style-help{margin-top:5px}
+.welcome-actions{gap:12px}
+.sample-note{margin:10px 0}
+
+/* The preview keeps its full example, with one restrained evidence-to-strength reveal. */
+.preview-scene{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr);gap:clamp(20px,3vw,42px);padding:20px 0 8px}
+.preview-conversation p{font-size:clamp(18px,1.7vw,23px);margin:7px 0 18px}
+.preview-discovery{display:block;border-top:1px solid var(--line)}
+.preview-discovery p,.preview-discovery p:nth-of-type(3),.high-contrast .preview-discovery p{padding:10px 0;margin:0;background:transparent;border:0;border-bottom:1px solid var(--line);font-size:12px}
+.preview-discovery p:not(:nth-of-type(2)){animation:none}
+.preview-discovery p:nth-of-type(2){animation:discovery-in 500ms var(--motion-ease) both;animation-delay:250ms}
+.preview-discovery p>span{display:block;color:var(--muted);margin-bottom:2px}
+.preview-discovery strong{font-size:17px}
+.preview-discovery small{font-size:12px}
+.preview-caption{display:none}
+.high-contrast .preview-discovery p{border-bottom-color:var(--ink)}
+@media(max-width:800px){.preview-scene{grid-template-columns:1fr;gap:12px}}
+@media(max-width:650px){.question-style-choice{grid-template-columns:1fr 1fr}.question-style-choice label{padding:8px}.preview-scene{gap:8px}}
+@media(max-width:650px){.welcome-privacy{font-size:12px}}
+.large-text .welcome-privacy{font-size:.9em}
+.high-contrast .welcome-privacy{color:#000}
+.large-text .welcome-intro{font-size:1em}
 @media(max-width:1024px){.workspace-grid{grid-template-columns:minmax(0,1.5fr) minmax(240px,1fr);gap:24px}}
 @media(max-width:650px){.workspace{padding-top:30px}.workspace-heading{margin-bottom:14px}.workspace-heading h1{font-size:clamp(36px,9vw,48px)}.workspace-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:22px}.canvas-companion{width:100%}.canvas-companion>summary{padding:14px 0}.canvas-companion[open] .canvas-pane{padding-top:16px}.interview-mode{margin-bottom:12px}.interview-mode>div{width:auto}.interview-mode label{flex:0 1 140px}.live-actions .button{width:auto}.voice-stage{padding:22px 16px}}

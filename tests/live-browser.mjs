@@ -42,7 +42,9 @@ try {
       });
     });
     await page.goto(baseURL);
+    await page.locator('.preferences summary').click();
     await page.getByRole('radio', { name: /Simple/ }).check();
+    await page.locator('.preferences summary').click();
     await page.getByRole('button', { name: 'I’d rather type' }).click();
     await page.locator('#message').fill('My unsent answer stays here.');
     await page.locator('.interview-mode label').filter({ hasText: 'Speak' }).click();

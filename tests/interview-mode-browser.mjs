@@ -34,7 +34,9 @@ try {
   });
 
   await page.goto(baseURL);
+  await page.locator('.preferences summary').click();
   await page.getByRole('radio', { name: /Simple/ }).check();
+  await page.locator('.preferences summary').click();
   await page.getByRole('button', { name: 'Start a conversation', exact: true }).click();
   assert.equal(await page.getByRole('radio', { name: 'Speak' }).isChecked(), true, 'No saved choice defaults to Voice');
   assert.equal(conversationRequests, 0, 'Selecting Voice does not start the text interview');
@@ -112,7 +114,9 @@ try {
     toolTrace: { selected: false, functionName: null, arguments: [], dispatched: false, outcome: 'no_tool_selected' }, interview: { status: 'active', questions: 1, answered: 0, limit: 12 },
   } }));
   await mobile.goto(baseURL);
+  await mobile.locator('.preferences summary').click();
   await mobile.getByRole('radio', { name: /Simple/ }).check();
+  await mobile.locator('.preferences summary').click();
   await mobile.getByRole('button', { name: 'Start a conversation', exact: true }).click();
   assert.equal(await mobile.locator('.canvas-companion > summary').isVisible(), true, 'Compact profile summary stays available on mobile');
   await mobile.locator('.canvas-companion > summary').click();

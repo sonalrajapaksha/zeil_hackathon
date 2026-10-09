@@ -9,9 +9,8 @@ export function HeroPreview() {
   return <section className={`hero-preview${paused ? ' is-paused' : ''}`} aria-label="Fictional conversation example">
     <div className="preview-heading"><span>Fictional example · no microphone</span><button type="button" className="text-button preview-motion-control" aria-pressed={paused} onClick={() => setPaused(!paused)}>{paused ? 'Play example' : 'Pause example'}</button><button type="button" className="text-button preview-motion-control" onClick={() => { setReplay(replay + 1); setPaused(false); }}>Replay</button></div>
     <div key={replay} className="preview-scene">
-      <div className="preview-conversation"><span>Access</span><p>Tell me about a time you helped someone.</p><div className="preview-signal" aria-hidden="true"><span /><span /><span /></div><span>You · fictional candidate</span><p>“I helped library visitors feel confident using computers.”</p></div>
-      <div className="preview-discovery"><span className="preview-connector" aria-hidden="true">↓</span><p>What you did <strong>Helped library visitors</strong></p><span className="preview-connector" aria-hidden="true">↓</span><p>What it demonstrates <strong>Customer assistance</strong><small>Example suggestion · needs your review</small></p><span className="preview-connector" aria-hidden="true">↓</span><p>Where it applies <strong>Customer support</strong><small>Example career direction, not a job offer</small></p></div>
+      <div className="preview-conversation"><span>Access asks</span><p>Tell me about a time you helped someone.</p><span>You share · fictional example</span><p>“I helped library visitors feel confident using computers.”</p></div>
+      <div className="preview-discovery"><p><span>What you did</span><strong>Helped library visitors</strong></p><p><span>Potential strength · your choice to confirm</span><strong>Customer assistance</strong><small>Example suggestion · needs your review</small></p><p><span>Where it could apply</span><strong>Customer support</strong><small>Example career direction, not a job offer</small></p></div>
     </div>
-    <p className="preview-caption">A conversation. A discovery. A next step.</p>
   </section>;
 }

@@ -14,7 +14,7 @@ type Step = "welcome" | "story" | "application";
 type ClaimKind = "skill" | "experience" | "education";
 type Claim = { id: string; kind: ClaimKind; text: string; evidence: string; confirmed: boolean };
 function emptyProfile(): CandidateProfile {
-  return { skills: [], experience: [], education: [], preferences: { largeText: false, highContrast: false, reducedMotion: false } };
+  return { skills: [], experience: [], education: [], preferences: { largeText: false, highContrast: false, reducedMotion: false, questionStyle: "standard" } };
 }
 function Mark({ small = false }: { small?: boolean }) {
   return <span className={`mark${small ? " mark-small" : ""}`} aria-hidden="true"><span /><span /><span /></span>;
@@ -53,7 +53,7 @@ export default function Home() {
   }, [chat]);
   useEffect(() => {
     const savedProfile = loadSavedProfile();
-    if (savedProfile) setProfile(savedProfile);
+    if (savedProfile) setProfile({ ...savedProfile, preferences: { ...savedProfile.preferences, questionStyle: savedProfile.preferences.questionStyle ?? "standard" } });
     setStorageReady(true);
   }, []);
   useEffect(() => {
@@ -423,20 +423,11 @@ export default function Home() {
         {step === "welcome" && <section className="welcome" aria-labelledby="welcome-heading">
           <div className="welcome-copy">
             <h1 id="welcome-heading"><span>Your experience.</span><span>Your future.</span></h1>
-            <p className="welcome-intro">Talk naturally with Access. Discover the skills behind your experiences. Accessibility-first career support for everyone, with a complete text alternative.</p>
-            <p className="welcome-friction">Instead of repeating your work history across long application forms, describe it once, review each detail, and reuse only what you confirm in an editable draft.</p>
-            <fieldset className="question-style welcome-style" aria-describedby="question-style-help"><legend>How should we ask questions?</legend>
-              <div className="question-style-choice">
-                <label className={profile.preferences.questionStyle === "simple" ? "is-selected" : ""}><input id="question-style-simple" type="radio" name="question-style-welcome" value="simple" checked={profile.preferences.questionStyle === "simple"} onChange={() => setQuestionStyle("simple")} /><span><strong>Simple</strong><small>Short sentences, familiar words</small></span></label>
-                <label className={profile.preferences.questionStyle === "standard" ? "is-selected" : ""}><input id="question-style-standard" type="radio" name="question-style-welcome" value="standard" checked={profile.preferences.questionStyle === "standard"} onChange={() => setQuestionStyle("standard")} /><span><strong>Standard</strong><small>Clear, natural conversation</small></span></label>
-              </div>
-              <p id="question-style-help">Choose one to begin. You can change this preference at any time.</p>
-            </fieldset>
-            <div className="welcome-actions"><button className="button button-primary button-large" onClick={() => { if (interviewMode === "text") begin(); else { setStep("story"); setAnnouncement("Voice is ready when you are. Starting it will request microphone permission."); } }} disabled={!profile.preferences.questionStyle}>{interviewMode === "text" ? "Continue in text" : "Start a conversation"}</button><button className="text-button" onClick={() => { if (interviewMode === "text") { applyInterviewMode("voice"); setStep("story"); } else { applyInterviewMode("text"); begin(); } }} disabled={!profile.preferences.questionStyle}>{interviewMode === "text" ? "Use voice instead" : "I’d rather type"}</button></div><p className="sample-note">You choose when the microphone starts. Every suggestion is yours to review.</p>
+            <p className="welcome-intro">Describe your experience once, review what Access learns, and reuse only what you confirm in an editable application draft. Accessibility-first career support for everyone, with text always available.</p>
+            <div className="welcome-actions"><button className="button button-primary button-large" onClick={() => { if (interviewMode === "text") begin(); else { setStep("story"); setAnnouncement("Voice is ready when you are. Starting it will request microphone permission."); } }}>{interviewMode === "text" ? "Continue in text" : "Start a conversation"}</button><button className="text-button" onClick={() => { if (interviewMode === "text") { applyInterviewMode("voice"); setStep("story"); } else { applyInterviewMode("text"); begin(); } }}>{interviewMode === "text" ? "Use voice instead" : "I’d rather type"}</button></div><p className="sample-note">You choose when the microphone starts. Every suggestion is yours to review.</p>
+            <p className="welcome-privacy">Interview text goes to Google Gemini to generate questions. Confirmed details and preferences are saved on this device; full conversation history and unapproved suggestions stay in memory. Reset &amp; delete clears saved details. Nothing is sent to an employer.</p>
           </div>
           <HeroPreview />
-          <div className="welcome-footer"><div><span className="footer-icon">01</span><span>Start with what you’ve done</span></div><div><span className="footer-icon">02</span><span>Review every suggestion</span></div><div><span className="footer-icon">03</span><span>Keep the final say</span></div></div>
-          <aside className="privacy-note"><span aria-hidden="true">◌</span><p><strong>Your story stays yours.</strong> Your interview text is sent to Google Gemini to generate questions. Access saves confirmed profile details, their short source evidence, and your chosen preferences on this device. Full conversation history and unapproved suggestions stay in memory only. Reset &amp; delete removes saved details. Nothing is sent to an employer.</p></aside>
         </section>}
 
         {step === "story" && <section className="workspace" aria-labelledby="story-heading">

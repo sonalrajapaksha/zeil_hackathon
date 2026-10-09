@@ -53,7 +53,9 @@ try {
       ws.onMessage((raw) => { if (JSON.parse(raw).setup) ws.send(JSON.stringify({ setupComplete: {} })); });
     });
     await page.goto(baseURL);
+    await page.locator('.preferences summary').click();
     await page.getByRole('radio', { name: /Simple/ }).check();
+    await page.locator('.preferences summary').click();
     await page.getByRole('button', { name: 'Start a conversation', exact: true }).click();
     await page.getByRole('button', { name: 'Start conversation', exact: true }).last().click();
     await page.locator('.voice-stage[data-voice-state="listening"]').waitFor();
@@ -120,7 +122,9 @@ try {
     // Reset while extraction is waiting must prevent late profile resurrection.
     assert.equal(textCalls, 0, 'The entire voice-to-export journey needs no text interview');
     await page.getByRole('button', { name: 'Reset & delete' }).click();
+    await page.locator('.preferences summary').click();
     await page.getByRole('radio', { name: /Simple/ }).check();
+    await page.locator('.preferences summary').click();
     await page.getByRole('button', { name: 'Start a conversation', exact: true }).click();
     await page.getByRole('button', { name: 'Start conversation', exact: true }).last().click();
     await page.locator('.voice-stage[data-voice-state="listening"]').waitFor();
