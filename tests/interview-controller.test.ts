@@ -12,7 +12,7 @@ test('out-of-section project and qualification evidence stays available and dupl
   assert.equal(candidate.experience[0].evidence.length, 2);
   assert.deepEqual(candidate.experience[0].sourceMessageIds, ['message-intro', 'message-work']);
   assert.equal(candidate.education.length, 1);
-  assert.match(controllerQuestion({ ...EMPTY_CONTROLLER, section: 'projects' }, candidate), /Robotics project/);
+  assert.match(controllerQuestion({ ...EMPTY_CONTROLLER, section: 'projects' }, candidate), /another project/);
   assert.match(controllerQuestion({ ...EMPTY_CONTROLLER, section: 'education' }, candidate), /First aid certificate/);
 });
 
@@ -41,7 +41,7 @@ test('a qualification mentioned early counts toward education completeness', () 
 });
 
 test('a complete out-of-order project is not introduced again, and partial project evidence gets a specific follow-up', () => {
-  const complete = appendProfileSuggestions(profile(), [{ kind: 'experience', text: 'Robotics project', evidence: 'I designed the robot' }, { kind: 'experience', text: 'Robotics project', evidence: 'I programmed it for competition' }]);
+  const complete = appendProfileSuggestions(profile(), [{ kind: 'experience', text: 'Retail assistant', evidence: 'I helped customers' }, { kind: 'experience', text: 'Retail assistant', evidence: 'I trained new starters' }, { kind: 'experience', text: 'Cashier', evidence: 'I handled customer purchases' }, { kind: 'experience', text: 'Cashier', evidence: 'I balanced tills accurately' }, { kind: 'experience', text: 'Robotics project', evidence: 'I designed the robot' }, { kind: 'experience', text: 'Robotics project', evidence: 'I programmed it for competition' }]);
   let state: InterviewController = { ...EMPTY_CONTROLLER, section: 'experience', guided: { ...EMPTY_CONTROLLER.guided, experience: 2 } };
   state = advanceInterview(state, complete, { id: 'finish-work', action: 'answer' });
   assert.equal(state.section, 'projects');
@@ -58,8 +58,19 @@ test('a third spontaneous project is retained without increasing guided project 
     candidate = appendProfileSuggestions(candidate, [{ kind: 'experience', text, evidence: `I worked on the ${index + 1} project` }]);
   assert.equal(candidate.experience.length, 3);
   const state = advanceInterview({ ...EMPTY_CONTROLLER, section: 'projects' }, candidate, { id: 'third-mentioned', action: 'answer', evidence: 'I worked on a garden sensor project' });
-  assert.equal(state.guided.projects, 1);
+  assert.equal(state.guided.projects, 2);
   assert.equal(candidate.experience.length, 3);
+});
+
+test('both guided projects keep getting missing-detail follow-ups until their evidence is complete', () => {
+  const candidate = appendProfileSuggestions(profile(), [
+    { kind: 'experience', text: 'Solar car project', evidence: 'I designed the frame' },
+    { kind: 'experience', text: 'Robotics project', evidence: 'I programmed the robot' },
+  ]);
+  const state = advanceInterview({ ...EMPTY_CONTROLLER, section: 'projects' }, candidate, { id: 'project-answer', action: 'answer', evidence: 'I programmed the robot' });
+  assert.equal(state.guided.projects, 2);
+  assert.equal(state.section, 'projects');
+  assert.match(controllerQuestion(state, candidate), /Solar car project/);
 });
 
 test('text and finalized voice turns share compatible progression; confirmed corrections are preserved', () => {
