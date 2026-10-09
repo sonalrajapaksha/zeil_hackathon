@@ -92,13 +92,13 @@ export default function Home() {
   const selected = DEMO_JOBS.find((job) => job.id === selectedJob)!;
 
   const addProfileSuggestions = useCallback((items: ProfileSuggestion[], sourceMessageId?: string, answer?: string) => {
-    setProfile((current) => appendProfileSuggestions(current, items, sourceMessageId));
+    setProfile((current) => appendProfileSuggestions(current, items, sourceMessageId, interviewController.rejected));
     if (answer) {
       const sourceId = sourceMessageId ?? `voice:${answer.toLocaleLowerCase().replace(/[^\p{L}\p{N}]/gu, '').slice(0, 80)}`;
-      const nextProfile = appendProfileSuggestions(profile, items, sourceId);
+      const nextProfile = appendProfileSuggestions(profile, items, sourceId, interviewController.rejected);
       setInterviewController((current) => advanceInterview(current, nextProfile, { id: sourceId, action: 'answer', evidence: answer }));
     }
-  }, [profile]);
+  }, [interviewController.rejected, profile]);
   const addVoiceSuggestions = useCallback((items: ProfileSuggestion[], answer: string, turnId: string) => {
     addProfileSuggestions(items, `voice:${turnId}`, answer);
   }, [addProfileSuggestions]);
@@ -167,7 +167,7 @@ export default function Home() {
 
   function startNewInterview() {
     const questionStyle = profile.preferences.questionStyle;
-    if (questionStyle) void requestTurn({ action: "start", history: [], questionStyle, controller: EMPTY_CONTROLLER });
+    if (questionStyle) void requestTurn({ action: "start", history: [], questionStyle, controller: { ...EMPTY_CONTROLLER, rejected: interviewController.rejected } });
   }
 
   function sendMessage(event: FormEvent<HTMLFormElement>) {
@@ -204,6 +204,9 @@ export default function Home() {
   }
 
   function removeClaim(kind: ClaimKind, id: string) {
+    const rejectedItem = kind === "skill" ? profile.skills.find((item) => item.id === id)?.name : kind === "experience" ? profile.experience.find((item) => item.id === id) : profile.education.find((item) => item.id === id)?.text;
+    const text = rejectedItem ? typeof rejectedItem === "string" ? rejectedItem : "text" in rejectedItem ? rejectedItem.text : [rejectedItem.role, rejectedItem.organisation].filter(Boolean).join(" · ") : "";
+    if (text) setInterviewController((current) => ({ ...current, rejected: [...new Set([...current.rejected, `${kind}:${text.trim().toLowerCase()}`])].slice(-200) }));
     setProfile((current) => ({
       ...current,
       ...(kind === "skill" ? { skills: current.skills.filter((item) => item.id !== id) } : {}),

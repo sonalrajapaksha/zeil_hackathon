@@ -5,7 +5,7 @@ export const INTERVIEW_SECTIONS = ['introduction', 'experience', 'projects', 'ed
 export type InterviewSection = typeof INTERVIEW_SECTIONS[number];
 export { InterviewControllerSchema };
 export type InterviewController = z.infer<typeof InterviewControllerSchema>;
-export const EMPTY_CONTROLLER: InterviewController = { section: 'introduction', guided: { experience: 0, projects: 0, education: 0 }, asked: { experience: 0, projects: 0, education: 0 }, skipped: [], awaitingAnother: null, processed: [], completed: false, earlyCompletion: false };
+export const EMPTY_CONTROLLER: InterviewController = { section: 'introduction', guided: { experience: 0, projects: 0, education: 0 }, asked: { experience: 0, projects: 0, education: 0 }, skipped: [], rejected: [], awaitingAnother: null, processed: [], completed: false, earlyCompletion: false };
 
 const order: InterviewSection[] = ['introduction', 'experience', 'projects', 'education', 'review', 'complete'];
 const caps = { experience: 2, projects: 2, education: 2 } as const;

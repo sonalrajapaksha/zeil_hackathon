@@ -137,7 +137,7 @@ export async function POST(request: Request) {
     }
     const latest = history.at(-1);
     const currentProfile = input.profile ?? { skills: [], experience: [], education: [], preferences: { largeText: false, highContrast: false, reducedMotion: false } };
-    const updatedProfile = appendProfileSuggestions(currentProfile, suggestions, latest?.role === 'user' ? latest.id : undefined);
+    const updatedProfile = appendProfileSuggestions(currentProfile, suggestions, latest?.role === 'user' ? latest.id : undefined, controller.rejected);
     const controllerTurnId = input.action === 'correct' ? `${latest?.id ?? 'correction'}:${(latest?.content ?? '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]/gu, '').slice(0, 80)}` : latest?.id ?? crypto.randomUUID();
     const nextController = input.action === 'start' || input.action === 'clarify' ? controller : advanceInterview(controller, updatedProfile, { id: controllerTurnId, action: input.action === 'skip' ? 'skip' : 'answer', evidence: latest?.role === 'user' ? latest.content : undefined });
     const controlledReply = !input.controller || input.action === 'clarify' ? reply : nextController.completed ? END_REPLY : controllerQuestion(nextController, updatedProfile);

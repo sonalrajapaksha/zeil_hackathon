@@ -18,7 +18,7 @@ export function validateProfileSuggestions(items: ProfileSuggestion[], answer: s
 }
 
 /** Every intake creates pending claims; an existing candidate edit always wins. */
-export function appendProfileSuggestions(profile: CandidateProfile, items: ProfileSuggestion[], sourceMessageId?: string): CandidateProfile {
+export function appendProfileSuggestions(profile: CandidateProfile, items: ProfileSuggestion[], sourceMessageId?: string, rejected: string[] = []): CandidateProfile {
   const next = { ...profile, skills: [...profile.skills], experience: [...profile.experience], education: [...profile.education] };
   const existing = new Set([
     ...profile.skills.map((item) => `skill:${item.name.trim().toLowerCase()}`),
@@ -28,6 +28,7 @@ export function appendProfileSuggestions(profile: CandidateProfile, items: Profi
   for (const item of items) {
     const text = item.text.trim();
     const key = `${item.kind}:${text.toLowerCase()}`;
+    if (rejected.includes(key)) continue;
     if (existing.has(key)) {
       if (item.kind === 'experience') next.experience = next.experience.map((entry) => ('text' in entry ? entry.text.trim().toLowerCase() === text.toLowerCase() : entry.role.trim().toLowerCase() === text.toLowerCase()) && !entry.confirmed
         ? { ...entry, evidence: [...new Set([...entry.evidence, item.evidence])], sourceMessageIds: [...new Set([...(entry.sourceMessageIds ?? []), ...(sourceMessageId ? [sourceMessageId] : [])])] }

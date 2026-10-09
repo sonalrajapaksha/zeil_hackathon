@@ -84,3 +84,9 @@ test('text and finalized voice turns share compatible progression; confirmed cor
   const merged = appendProfileSuggestions(confirmed, [{ kind: 'experience', text: 'Retail assistant', evidence: 'I also trained a new starter' }]);
   assert.deepEqual(merged.experience, confirmed.experience);
 });
+
+test('a candidate-rejected suggestion is not re-added by later extraction', () => {
+  const rejected = ['skill:leadership'];
+  const merged = appendProfileSuggestions(profile(), [{ kind: 'skill', text: 'Leadership', evidence: 'I led the shift handover' }], 'later-answer', rejected);
+  assert.equal(merged.skills.length, 0);
+});
