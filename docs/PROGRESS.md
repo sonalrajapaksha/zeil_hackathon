@@ -1,6 +1,12 @@
 # Build progress / cross-model handoff
 Current milestone: M2 conversational AI; live Gemini flow verified. No ZEIL bonus requirements are verified.
 
+## Root hydration warning — 2026-10-09
+
+- **PASS:** React reported only browser-extension attributes (`speedupyoutubeads` and `resize`) injected on the root `<html>` element. Added `suppressHydrationWarning` there, the narrow boundary for this external mutation.
+- **Checks:** `npm run typecheck` PASS; `npm run build` PASS.
+- **Next:** no follow-up task; if the warning persists, verify in a clean browser profile with extensions disabled.
+
 | Task | Status | Commit | Verification | Blockers |
 |---|---|---|---|---|
 | 01 | PASS (UI/build); visual screenshot QA unavailable | `fc779a3` | `npm run typecheck` PASS; `npm run build` PASS; local `curl` HTTP 200 | Browser-control tool unavailable in this session, so desktop/mobile screenshots and interactive browser QA remain outstanding |
