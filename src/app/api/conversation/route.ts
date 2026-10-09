@@ -3,6 +3,8 @@ import { SENSITIVE_PROFILE_CLAIM as SENSITIVE_CLAIM, validateProfileSuggestions 
 import { z } from 'zod';
 import { CLARIFICATION_REQUEST, ConversationRequestSchema, ConversationResponseSchema, INTERVIEW_LIMIT, type ConversationErrorSchema } from '../../../lib/contracts.ts';
 import { END_REPLY, prepareTurn, progress } from '../../../lib/interview.ts';
+import { EMPTY_CONTROLLER, advanceInterview, controllerQuestion, InterviewControllerSchema } from '../../../lib/interview-controller.ts';
+import { appendProfileSuggestions } from '../../../lib/profile-suggestions.ts';
 
 export const runtime = 'nodejs';
 export const maxDuration = 40;
@@ -62,8 +64,9 @@ export async function POST(request: Request) {
   }
 
   const history = prepareTurn(input);
+  const controller = InterviewControllerSchema.parse(input.controller ?? EMPTY_CONTROLLER);
   if (input.action === 'end' || input.action !== 'clarify' && progress(history).questions >= INTERVIEW_LIMIT) {
-    return Response.json(ConversationResponseSchema.parse({ reply: END_REPLY, suggestions: [], toolTrace: { selected: false, functionName: null, arguments: [], dispatched: false, outcome: 'no_tool_selected' }, history, interview: progress(history, true) }), { headers: { 'Cache-Control': 'no-store' } });
+    return Response.json(ConversationResponseSchema.parse({ reply: END_REPLY, suggestions: [], toolTrace: { selected: false, functionName: null, arguments: [], dispatched: false, outcome: 'no_tool_selected' }, history, interview: progress(history, true), controller: { ...controller, completed: true, section: 'complete', earlyCompletion: input.action === 'end' } }), { headers: { 'Cache-Control': 'no-store' } });
   }
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) return failure('NOT_CONFIGURED', 'AI interviewing is not configured. Ask the demo host to set GEMINI_API_KEY on the server, then retry.', 503, true);
@@ -132,8 +135,14 @@ export async function POST(request: Request) {
     } catch {
       return failure('INVALID_RESPONSE', 'The AI could not return a usable question. Your story is unchanged. Please retry or end the interview.', 502, true);
     }
-    const nextHistory = [...history, { id: crypto.randomUUID(), role: 'assistant' as const, content: reply }];
-    return Response.json(ConversationResponseSchema.parse({ reply, suggestions, toolTrace, history: nextHistory, interview: progress(nextHistory) }), { headers: { 'Cache-Control': 'no-store' } });
+    const latest = history.at(-1);
+    const currentProfile = input.profile ?? { skills: [], experience: [], education: [], preferences: { largeText: false, highContrast: false, reducedMotion: false } };
+    const updatedProfile = appendProfileSuggestions(currentProfile, suggestions, latest?.role === 'user' ? latest.id : undefined);
+    const controllerTurnId = input.action === 'correct' ? `${latest?.id ?? 'correction'}:${(latest?.content ?? '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]/gu, '').slice(0, 80)}` : latest?.id ?? crypto.randomUUID();
+    const nextController = input.action === 'start' || input.action === 'clarify' ? controller : advanceInterview(controller, updatedProfile, { id: controllerTurnId, action: input.action === 'skip' ? 'skip' : 'answer', evidence: latest?.role === 'user' ? latest.content : undefined });
+    const controlledReply = !input.controller || input.action === 'clarify' ? reply : nextController.completed ? END_REPLY : controllerQuestion(nextController, updatedProfile);
+    const nextHistory = [...history, { id: crypto.randomUUID(), role: 'assistant' as const, content: controlledReply }];
+    return Response.json(ConversationResponseSchema.parse({ reply: controlledReply, suggestions, toolTrace, history: nextHistory, interview: progress(nextHistory, nextController.completed), controller: nextController }), { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     if (error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name))
       return failure('TIMEOUT', 'The AI took too long. Your story is unchanged. Please retry.', 504, true);

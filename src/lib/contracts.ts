@@ -1,8 +1,8 @@
 import { z } from "zod";
-export const ExperienceSchema = z.object({ id:z.string(), organisation:z.string(), role:z.string(), dateRange:z.string().optional(), evidence:z.array(z.string()), confirmed:z.boolean().default(false) });
-export const ProfileSkillSchema = z.object({ id:z.string(), name:z.string(), evidence:z.string(), confirmed:z.boolean().default(false) });
-export const ProfileExperienceSchema = z.object({ id:z.string(), text:z.string(), evidence:z.array(z.string()), confirmed:z.boolean().default(false) });
-export const ProfileEducationSchema = z.object({ id:z.string(), text:z.string(), evidence:z.string(), confirmed:z.boolean().default(false) });
+export const ExperienceSchema = z.object({ id:z.string(), organisation:z.string(), role:z.string(), dateRange:z.string().optional(), evidence:z.array(z.string()), sourceMessageIds:z.array(z.string().max(100)).max(200).optional(), confirmed:z.boolean().default(false) });
+export const ProfileSkillSchema = z.object({ id:z.string(), name:z.string(), evidence:z.string(), sourceMessageIds:z.array(z.string().max(100)).max(200).optional(), confirmed:z.boolean().default(false) });
+export const ProfileExperienceSchema = z.object({ id:z.string(), text:z.string(), evidence:z.array(z.string()), sourceMessageIds:z.array(z.string().max(100)).max(200).optional(), confirmed:z.boolean().default(false) });
+export const ProfileEducationSchema = z.object({ id:z.string(), text:z.string(), evidence:z.string(), sourceMessageIds:z.array(z.string().max(100)).max(200).optional(), confirmed:z.boolean().default(false) });
 export const CandidateProfileSchema = z.object({ name:z.string().optional(), summary:z.string().optional(), skills:z.array(ProfileSkillSchema), experience:z.array(z.union([ExperienceSchema, ProfileExperienceSchema])), education:z.array(ProfileEducationSchema), preferences:z.object({largeText:z.boolean(), highContrast:z.boolean(), reducedMotion:z.boolean(), questionStyle:z.enum(['simple','standard']).optional(), interviewMode:z.enum(['voice','text']).optional()}) });
 export const JobListingSchema = z.object({id:z.string(),title:z.string(),company:z.string(),location:z.string(),arrangement:z.string(),description:z.string(),requirements:z.array(z.string())});
 export const ConversationMessageSchema = z.object({id:z.string(),role:z.enum(['user','assistant']),content:z.string()});
@@ -32,6 +32,7 @@ export type ApplicationPackage = z.infer<typeof ApplicationPackageSchema>;
 export const INTERVIEW_LIMIT = 12;
 export const QuestionStyleSchema = z.enum(['simple', 'standard']);
 export const CLARIFICATION_REQUEST = '[Candidate requested clarification]';
+export const InterviewControllerSchema = z.object({ section: z.enum(['introduction','experience','projects','education','review','complete']), guided: z.object({ experience:z.number().int().min(0).max(2), projects:z.number().int().min(0).max(2), education:z.number().int().min(0).max(2) }).strict(), skipped:z.array(z.enum(['introduction','experience','projects','education','review','complete'])), awaitingAnother:z.enum(['experience','projects','education']).nullable(), processed:z.array(z.string().min(1).max(4000)).max(200), completed:z.boolean(), earlyCompletion:z.boolean() }).strict();
 export const InterviewHistorySchema = z.array(ConversationMessageSchema.extend({
   id: z.string().min(1).max(100),
   content: z.string().trim().min(1).max(4000),
@@ -47,6 +48,8 @@ export const ConversationRequestSchema = z.object({
   action: z.enum(['start', 'answer', 'skip', 'correct', 'clarify', 'end']),
   history: InterviewHistorySchema,
   questionStyle: QuestionStyleSchema,
+  controller: InterviewControllerSchema.optional(),
+  profile: CandidateProfileSchema.optional(),
   answer: z.string().trim().min(1).max(4000).optional(),
   messageId: z.string().min(1).max(100).optional(),
 }).strict().superRefine((request, ctx) => {
@@ -73,6 +76,7 @@ export const ConversationResponseSchema = z.object({
   toolTrace: z.object({ selected:z.boolean(), functionName:z.string().nullable(), arguments:z.array(z.object({ kind:z.enum(['skill','experience','education']), text:z.string().trim().min(1).max(240), evidence:z.string().trim().min(1).max(400) }).strict()).max(5), dispatched:z.boolean(), outcome:z.enum(['no_tool_selected','pending_for_review','no_safe_items']) }).strict(),
   history: InterviewHistorySchema,
   interview: InterviewProgressSchema,
+  controller: InterviewControllerSchema.optional(),
 }).strict();
 export const ConversationErrorSchema = z.object({
   error: z.object({

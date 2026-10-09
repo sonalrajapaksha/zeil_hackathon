@@ -1,6 +1,22 @@
 # Build progress / cross-model handoff
 Current milestone: M2 conversational AI; live Gemini flow verified. No ZEIL bonus requirements are verified.
 
+## Quieter welcome page — 2026-10-09
+
+- **PASS:** reduced welcome-page clutter while keeping the current visual identity and all controls. Consolidated the intro into one benefit statement, removed the repeated footer steps while retaining the journey navigation, compacted the required Simple/Standard choices, and flattened the fictional conversation preview into a readable evidence-to-strength list. Pause/replay remain available and still control the strength reveal; accessibility preferences, voice/text actions, consent, privacy details, and profile review language remain present.
+- **Changed:** `src/app/page.tsx`, `src/app/styles.css`, `src/components/HeroPreview.tsx`; updated existing browser assertions in `tests/redesign-browser.mjs` and `tests/browser-smoke.mjs` for the simplified preview and the current in-progress interview controller's opening question.
+- **Checks:** `npm run typecheck`, `npm test` (40), `npm run build`, and `git diff --check` PASS. Production browser `test:redesign-browser` PASS at 1440/1024/768/390/320px; `test:browser` PASS at 1280/640/320px, including keyboard flow, preferences, saved profile and application downloads. Screenshot review at 1440px and 320px showed no horizontal overflow. Impeccable detector reports the existing Inter font warning pinned by `docs/DESIGN.md`.
+- **Next:** finish the unrelated finite adaptive interview controller work already in progress; no welcome-page follow-up identified.
+
+## Finite adaptive interview controller — 2026-10-09
+
+- **Implementation:** added a typed section state machine for introduction, work experience, projects, education, review and completion. Text turns carry validated controller state and the canonical in-session CandidateProfile; deterministic question planning uses cross-section evidence, section skips, guided caps, another-entry consent, correction-specific event keys and idempotent processed-turn IDs. The shared suggestion merge combines new non-conflicting evidence into existing unconfirmed entries without replacing confirmed claims; Canvas entries retain source message IDs and corrections remove unconfirmed claims from replaced sources.
+- **Voice:** finalized Live candidate answers continue through the existing `/api/profile-proposals` extraction path; resulting evidence updates the same Career Canvas and controller state as text. Partial transcripts, repeated final events, clarifications and skips remain excluded by the current voice collector. New Live sessions receive the current section goal and a bounded profile summary, disclosed next to microphone consent. The active Live model still generates spoken follow-ups independently, so controller prompts cannot replace a spoken response mid-session. Controller completion stops voice.
+- **Known model limit:** existing profile contracts represent projects as experience entries; project classification currently uses candidate/model supplied entry text. There is no dedicated project form/category or persistent conversation transcript. Only confirmed profile claims persist.
+- **Baseline:** before changes, `npm run typecheck`, `npm test` (36), and `npm run build` PASS. No lint script/configuration is present in `package.json` or repository files.
+- **Verification:** baseline `npm run typecheck`, `npm test` (36), `npm run build` PASS. Final: `npm run typecheck` PASS; `npm test` PASS (43); `npm run build` PASS; `git diff --check` PASS; `ACCESS_TEST_URL=http://localhost:3030 PLAYWRIGHT_MODULE=<cached Playwright> npm run test:live-browser` PASS at 1440/1024/768/390/320; `... npm run test:interview-mode-browser` PASS. Both browser suites use synthetic microphone/WebSocket fixtures. `npm run lint` cannot run: no lint script is configured. Genuine Gemini interview test has not been rerun. Browser run without the `PLAYWRIGHT_MODULE` environment failed because Playwright is not a project dependency; cached-module rerun passed.
+- **Next:** manual VoiceOver/NVDA, physical microphone and actual 200% browser zoom remain unverified. No deployment or push.
+
 ## Root hydration warning — 2026-10-09
 
 - **PASS:** React reported only browser-extension attributes (`speedupyoutubeads` and `resize`) injected on the root `<html>` element. Added `suppressHydrationWarning` there, the narrow boundary for this external mutation.

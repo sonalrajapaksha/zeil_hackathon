@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { collectVoiceAnswer, type VoiceAnswerBuffer } from '@/lib/live-answers';
 import { CvImportErrorSchema, INTERVIEW_LIMIT, ProfileProposalsResponseSchema } from '@/lib/contracts';
 import type { ProfileSuggestion } from '@/lib/profile-suggestions';
+import type { CandidateProfile } from '@/lib/contracts';
+import type { InterviewController } from '@/lib/interview-controller';
 import { encodePcm, decodePcm } from '@/lib/live-audio';
 import type { LiveServerMessage } from '@google/genai';
 
@@ -16,8 +18,8 @@ type Resources = {
   sources: Set<AudioBufferSourceNode>; nextPlay: number; answer: VoiceAnswerBuffer;
 };
 
-export function LiveVoice({ questionStyle, available, visible, onSessionActive, onUseText, onSuggestions }: {
-  onSuggestions: (items: ProfileSuggestion[]) => void; questionStyle?: 'simple' | 'standard'; available: boolean; visible: boolean; onSessionActive: (active: boolean) => void; onUseText: (text: string) => void;
+export function LiveVoice({ questionStyle, available, visible, profile, controller, onSessionActive, onUseText, onSuggestions }: {
+  onSuggestions: (items: ProfileSuggestion[], answer: string, turnId: string) => void; questionStyle?: 'simple' | 'standard'; available: boolean; visible: boolean; profile: CandidateProfile; controller: InterviewController; onSessionActive: (active: boolean) => void; onUseText: (text: string) => void;
 }) {
   const [state, setState] = useState<'idle' | 'connecting' | 'live'>('idle');
   const [status, setStatus] = useState('Voice is off.');
@@ -56,7 +58,7 @@ export function LiveVoice({ questionStyle, available, visible, onSessionActive, 
         }
         const { suggestions } = ProfileProposalsResponseSchema.parse(body);
         if (cancelled) return;
-        onSuggestions(suggestions);
+        onSuggestions(suggestions, nextTurn.answer, nextTurn.id);
         setVoiceTurns((turns) => turns.map((turn) => turn.id === nextTurn.id ? { ...turn, answer: '', status: 'done' } : turn));
         setAnswerNotice(suggestions.length ? 'Voice suggestions are ready in your Career Canvas. Review each one before approving.' : 'Voice answer reviewed. No new career details were found.');
       } catch (failure) {
@@ -101,6 +103,9 @@ export function LiveVoice({ questionStyle, available, visible, onSessionActive, 
   useEffect(() => {
     if (resources.current) stop('Voice stopped because your question style or workspace changed. Your text is unchanged.');
   }, [questionStyle, available]);
+  useEffect(() => {
+    if (controller.completed && resources.current) stop('Your interview is complete. Review or correct your career canvas at any time.');
+  }, [controller.completed]);
   useEffect(() => {
     function leave() { if (resources.current) stop('Voice stopped while Access was in the background.'); }
     function visibility() { if (document.hidden) leave(); }
@@ -186,7 +191,7 @@ export function LiveVoice({ questionStyle, available, visible, onSessionActive, 
       current.timer = setTimeout(fail, 20_000);
       await current.context.audioWorklet.addModule('/live-pcm-worklet.js');
       if (!valid()) return;
-      const response = await fetch('/api/live-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionStyle }), signal: current.controller.signal });
+      const response = await fetch('/api/live-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionStyle, controller, profile }), signal: current.controller.signal });
       const body = await response.json();
       if (!valid()) return;
       if (!response.ok) throw new Error(typeof body.error?.message === 'string' ? body.error.message : 'Voice is unavailable. Continue by text.');
@@ -306,7 +311,7 @@ export function LiveVoice({ questionStyle, available, visible, onSessionActive, 
   if (!visible) return null;
   return <section className="live-voice" aria-labelledby="live-heading">
       <h3 id="live-heading">Speak with Access</h3>
-      <p className="voice-consent">Start when you’re ready. Gemini receives your microphone audio; completed answers may suggest profile details for your review. Access does not save audio or the full transcript.</p>
+      <p className="voice-consent">Start when you’re ready. Gemini receives your microphone audio and a short summary of profile details already in this workspace to avoid repeat questions. Completed answers may suggest more details for your review. Access does not save audio or the full transcript.</p>
       <div ref={stage} className="voice-stage" data-voice-state={visualState}>
         <div className="voice-signal" aria-hidden="true"><span /><span /><span /><svg viewBox="0 0 240 80"><path ref={waveform} d="M0 40 L240 40" /></svg></div>
         <p className="voice-state-label">{visualState === 'speaking' ? 'Access is speaking' : visualState === 'listening' ? 'Listening · microphone on' : visualState === 'interrupted' ? 'Interrupted · listening to you' : visualState === 'muted' ? 'Microphone muted' : visualState === 'connecting' ? 'Getting connected' : visualState === 'error' ? 'Let’s try again' : 'Ready when you are'}</p>

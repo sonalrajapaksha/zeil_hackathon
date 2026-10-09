@@ -7,6 +7,7 @@ import { DEMO_JOBS } from "@/lib/jobs";
 import { ApplicationErrorSchema, ApplicationPackageSchema, CLARIFICATION_REQUEST, ConversationErrorSchema, ConversationResponseSchema, CvImportErrorSchema, CvImportResponseSchema, type ApplicationPackage, type CandidateProfile, type ConversationMessage, type ConversationRequest } from "@/lib/contracts";
 import { appendProfileSuggestions, type ProfileSuggestion } from "@/lib/profile-suggestions";
 import { EMPTY_INTERVIEW, progress } from "@/lib/interview";
+import { EMPTY_CONTROLLER, advanceInterview, type InterviewController } from "@/lib/interview-controller";
 import { deleteSavedProfile, loadSavedProfile, saveProfile } from "@/lib/persistence";
 
 type Step = "welcome" | "story" | "application";
@@ -36,6 +37,7 @@ export default function Home() {
   const [storageReady, setStorageReady] = useState(false);
   const [chat, setChat] = useState<ConversationMessage[]>([]);
   const [interview, setInterview] = useState(EMPTY_INTERVIEW);
+  const [interviewController, setInterviewController] = useState<InterviewController>(EMPTY_CONTROLLER);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [failedRequest, setFailedRequest] = useState<ConversationRequest | null>(null);
@@ -89,9 +91,17 @@ export default function Home() {
   const [announcement, setAnnouncement] = useState("");
   const selected = DEMO_JOBS.find((job) => job.id === selectedJob)!;
 
-  const addProfileSuggestions = useCallback((items: ProfileSuggestion[]) => {
-    setProfile((current) => appendProfileSuggestions(current, items));
-  }, []);
+  const addProfileSuggestions = useCallback((items: ProfileSuggestion[], sourceMessageId?: string, answer?: string) => {
+    setProfile((current) => appendProfileSuggestions(current, items, sourceMessageId));
+    if (answer) {
+      const sourceId = sourceMessageId ?? `voice:${answer.toLocaleLowerCase().replace(/[^\p{L}\p{N}]/gu, '').slice(0, 80)}`;
+      const nextProfile = appendProfileSuggestions(profile, items, sourceId);
+      setInterviewController((current) => advanceInterview(current, nextProfile, { id: sourceId, action: 'answer', evidence: answer }));
+    }
+  }, [profile]);
+  const addVoiceSuggestions = useCallback((items: ProfileSuggestion[], answer: string, turnId: string) => {
+    addProfileSuggestions(items, `voice:${turnId}`, answer);
+  }, [addProfileSuggestions]);
 
   async function requestTurn(request: ConversationRequest) {
     if (activeRequest.current) return;
@@ -103,7 +113,7 @@ export default function Home() {
     try {
       const response = await fetch("/api/conversation", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request), signal: controller.signal,
+        body: JSON.stringify({ ...request, controller: request.controller ?? interviewController, profile }), signal: controller.signal,
       });
       const body: unknown = await response.json();
       if (!response.ok) {
@@ -115,17 +125,19 @@ export default function Home() {
       const result = parsed.data;
       if (activeRequest.current !== controller) return;
       setChat(result.history); setInterview(result.interview);
+      if (result.controller) setInterviewController(result.controller);
       if (request.action === "correct") {
         const remainingAnswers = new Map(result.history.filter((item) => item.role === "user").map((item) => [item.id, item.content]));
-        const replacedAnswers = request.history.filter((item) => item.role === "user" && remainingAnswers.get(item.id) !== item.content).map((item) => item.content);
-        if (replacedAnswers.length) setProfile((current) => ({
+        const replacedIds = request.history.filter((item) => item.role === "user" && remainingAnswers.get(item.id) !== item.content).map((item) => item.id);
+        if (replacedIds.length) setProfile((current) => ({
           ...current,
-          skills: current.skills.filter((item) => item.confirmed || !replacedAnswers.some((answer) => answer.includes(item.evidence))),
-          experience: current.experience.filter((item) => item.confirmed || !replacedAnswers.some((answer) => item.evidence.some((evidence) => answer.includes(evidence)))),
-          education: current.education.filter((item) => item.confirmed || !replacedAnswers.some((answer) => answer.includes(item.evidence))),
+          skills: current.skills.filter((item) => item.confirmed || !replacedIds.some((id) => item.sourceMessageIds?.includes(id))),
+          experience: current.experience.filter((item) => item.confirmed || !replacedIds.some((id) => item.sourceMessageIds?.includes(id))),
+          education: current.education.filter((item) => item.confirmed || !replacedIds.some((id) => item.sourceMessageIds?.includes(id))),
         }));
       }
-      if (result.suggestions.length) addProfileSuggestions(result.suggestions);
+      const latestAnswerId = result.history.at(-2)?.role === "user" ? result.history.at(-2)!.id : undefined;
+      if (result.suggestions.length) addProfileSuggestions(result.suggestions, latestAnswerId);
       if (request.action !== "clarify") setMessage("");
       setCorrectionId(null);
       setAnnouncement(result.interview.status === "ended" ? "Interview ended. Your history is available for review." : result.toolTrace.selected ? `Gemini selected the profile update tool. ${result.toolTrace.arguments.length} validated suggestion${result.toolTrace.arguments.length === 1 ? " is" : "s are"} ready for your review.` : result.suggestions.length ? `A new AI question and ${result.suggestions.length} profile suggestion${result.suggestions.length === 1 ? "" : "s"} to review are ready.` : "A new AI question is ready.");
@@ -155,7 +167,7 @@ export default function Home() {
 
   function startNewInterview() {
     const questionStyle = profile.preferences.questionStyle;
-    if (questionStyle) void requestTurn({ action: "start", history: [], questionStyle });
+    if (questionStyle) void requestTurn({ action: "start", history: [], questionStyle, controller: EMPTY_CONTROLLER });
   }
 
   function sendMessage(event: FormEvent<HTMLFormElement>) {
@@ -170,7 +182,7 @@ export default function Home() {
   function endInterview() {
     activeRequest.current?.abort(); activeRequest.current = null;
     setPending(false); setError(""); setFailedRequest(null); setCorrectionId(null);
-    setInterview(progress(chat, true));
+    setInterview(progress(chat, true)); setInterviewController((current) => ({ ...current, section: "complete", completed: true, earlyCompletion: true }));
     setAnnouncement("Interview ended. Your conversation and unsent text remain here for review.");
   }
 
@@ -369,7 +381,7 @@ export default function Home() {
     activeRequest.current?.abort(); activeRequest.current = null;
     activeCvImport.current?.abort(); activeCvImport.current = null; setCvImportPending(false); setCvImportError("");
     setPending(false); setError(""); setFailedRequest(null); setCorrectionId(null); setInterview(EMPTY_INTERVIEW);
-    setModeSwitchPending(false); setVoiceSessionActive(false); setVoiceAnswerToReview(null); setModeNotice(""); setStep("welcome"); setChat([]); setProfile(emptyProfile()); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setCv(""); setLetter(""); setDraftJobId(null); setUnverifiedClaims([]); setApplicationError(""); setAnnouncement("Your session has been reset.");
+    setModeSwitchPending(false); setVoiceSessionActive(false); setVoiceAnswerToReview(null); setModeNotice(""); setStep("welcome"); setChat([]); setInterviewController(EMPTY_CONTROLLER); setProfile(emptyProfile()); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setCv(""); setLetter(""); setDraftJobId(null); setUnverifiedClaims([]); setApplicationError(""); setAnnouncement("Your session has been reset.");
   }
 
   return (
@@ -441,7 +453,7 @@ export default function Home() {
                 <p>{voiceAnswerToReview !== null ? "Microphone capture and playback will stop. This transcript will be added to the editable text field." : "Microphone capture and playback will stop. Completed answers and suggestions stay in your Career Canvas; an unfinished answer may not be saved."}</p>
                 <div><button className="button button-dark" onClick={confirmTextSwitch}>{voiceAnswerToReview !== null ? "Stop voice and review answer" : "Stop voice and switch"}</button><button className="text-button" onClick={cancelTextSwitch}>Keep using Voice</button></div>
               </div>}
-              <LiveVoice visible={interviewMode === "voice"} questionStyle={profile.preferences.questionStyle} available={interviewMode === "voice" && !pending} onSessionActive={setVoiceSessionActive} onSuggestions={addProfileSuggestions} onUseText={reviewVoiceAnswer} />
+              <LiveVoice visible={interviewMode === "voice"} questionStyle={profile.preferences.questionStyle} available={interviewMode === "voice" && !pending} profile={profile} controller={interviewController} onSessionActive={setVoiceSessionActive} onSuggestions={addVoiceSuggestions} onUseText={reviewVoiceAnswer} />
               {interviewMode === "text" && <>
               <div ref={chatLog} className={`chat-log${!chat.length ? " is-empty" : ""}`} role="region" tabIndex={chat.length ? 0 : -1} aria-label="Conversation history" aria-busy={pending}>
                 {chat.map((line) => <div key={line.id} className={`chat-line ${line.role === "user" ? "you" : "access"}`}><div className="avatar" aria-hidden="true">{line.role === "user" ? (profile.name?.[0] || "Y") : <Mark small />}</div><div><span className="speaker">{line.role === "user" ? "You" : "Access · Gemini"}</span><p>{line.content === CLARIFICATION_REQUEST ? "Could you clarify this question?" : line.content}</p>{line.role === "user" && !["[Question skipped by candidate]", CLARIFICATION_REQUEST].includes(line.content) && <button className="text-button" disabled={pending || interview.status === "ended"} onClick={() => { setCorrectionId(line.id); setMessage(line.content); setError(""); setFailedRequest(null); messageInput.current?.focus(); }}>Correct this answer</button>}</div></div>)}

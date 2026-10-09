@@ -18,7 +18,7 @@ export function validateProfileSuggestions(items: ProfileSuggestion[], answer: s
 }
 
 /** Every intake creates pending claims; an existing candidate edit always wins. */
-export function appendProfileSuggestions(profile: CandidateProfile, items: ProfileSuggestion[]): CandidateProfile {
+export function appendProfileSuggestions(profile: CandidateProfile, items: ProfileSuggestion[], sourceMessageId?: string): CandidateProfile {
   const next = { ...profile, skills: [...profile.skills], experience: [...profile.experience], education: [...profile.education] };
   const existing = new Set([
     ...profile.skills.map((item) => `skill:${item.name.trim().toLowerCase()}`),
@@ -28,12 +28,20 @@ export function appendProfileSuggestions(profile: CandidateProfile, items: Profi
   for (const item of items) {
     const text = item.text.trim();
     const key = `${item.kind}:${text.toLowerCase()}`;
-    if (existing.has(key)) continue;
+    if (existing.has(key)) {
+      if (item.kind === 'experience') next.experience = next.experience.map((entry) => ('text' in entry ? entry.text.trim().toLowerCase() === text.toLowerCase() : entry.role.trim().toLowerCase() === text.toLowerCase()) && !entry.confirmed
+        ? { ...entry, evidence: [...new Set([...entry.evidence, item.evidence])], sourceMessageIds: [...new Set([...(entry.sourceMessageIds ?? []), ...(sourceMessageId ? [sourceMessageId] : [])])] }
+        : entry);
+      if (item.kind === 'education') next.education = next.education.map((entry) => entry.text.trim().toLowerCase() === text.toLowerCase() && !entry.confirmed ? { ...entry, evidence: [...new Set([entry.evidence, item.evidence])].join(' · '), sourceMessageIds: [...new Set([...(entry.sourceMessageIds ?? []), ...(sourceMessageId ? [sourceMessageId] : [])])] } : entry);
+      if (item.kind === 'skill') next.skills = next.skills.map((entry) => entry.name.trim().toLowerCase() === text.toLowerCase() && !entry.confirmed ? { ...entry, evidence: [...new Set([entry.evidence, item.evidence])].join(' · '), sourceMessageIds: [...new Set([...(entry.sourceMessageIds ?? []), ...(sourceMessageId ? [sourceMessageId] : [])])] } : entry);
+      continue;
+    }
     existing.add(key);
     const id = crypto.randomUUID();
-    if (item.kind === 'skill') next.skills.push({ id, name: text, evidence: item.evidence, confirmed: false });
-    else if (item.kind === 'experience') next.experience.push({ id, text, evidence: [item.evidence], confirmed: false });
-    else next.education.push({ id, text, evidence: item.evidence, confirmed: false });
+    const source = sourceMessageId ? { sourceMessageIds: [sourceMessageId] } : {};
+    if (item.kind === 'skill') next.skills.push({ id, name: text, evidence: item.evidence, ...source, confirmed: false });
+    else if (item.kind === 'experience') next.experience.push({ id, text, evidence: [item.evidence], ...source, confirmed: false });
+    else next.education.push({ id, text, evidence: item.evidence, ...source, confirmed: false });
   }
   return next;
 }

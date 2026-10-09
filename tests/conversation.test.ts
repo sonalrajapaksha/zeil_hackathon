@@ -3,6 +3,7 @@ import { afterEach, test, mock } from 'node:test';
 import { POST } from '../src/app/api/conversation/route.ts';
 import { CLARIFICATION_REQUEST, ConversationRequestSchema, ConversationResponseSchema, INTERVIEW_LIMIT } from '../src/lib/contracts.ts';
 import { prepareTurn } from '../src/lib/interview.ts';
+import { EMPTY_CONTROLLER } from '../src/lib/interview-controller.ts';
 
 const originalKey = process.env.GEMINI_API_KEY;
 const originalModel = process.env.GEMINI_MODEL;
@@ -63,6 +64,17 @@ test('follow-up sends actual context and retains history in order', async () => 
   assert.equal(sent.contents[1].parts[0].text, answer.content);
   assert.match(sent.systemInstruction.parts[0].text, /Question style: simple/);
   assert.equal(sentThinking(sdk.mock.calls[0].arguments[1]), undefined);
+});
+
+test('typed controller state selects the next text objective and is returned for the next mode', async () => {
+  fakeGemini('Tell me something about your work?', []);
+  const profile = { skills: [], experience: [], education: [], preferences: { largeText: false, highContrast: false, reducedMotion: false } };
+  const start = ConversationResponseSchema.parse(await (await POST(request({ action: 'start', history: [], questionStyle: 'standard', controller: EMPTY_CONTROLLER, profile }))).json());
+  assert.equal(start.reply, 'What kind of work are you interested in, and what is one experience you would like to include?');
+  assert.equal(start.controller?.section, 'introduction');
+  const next = ConversationResponseSchema.parse(await (await POST(request({ action: 'answer', history: start.history, answer: 'I am interested in customer service.', questionStyle: 'standard', controller: start.controller, profile }))).json());
+  assert.equal(next.controller?.section, 'experience');
+  assert.match(next.reply, /Tell me about a job/);
 });
 
 test('profile suggestions carry exact answer evidence and unsupported evidence fails safely', async () => {
