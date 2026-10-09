@@ -20,7 +20,6 @@ function Mark({ small = false }: { small?: boolean }) {
 }
 
 export default function Home() {
-  const [voiceFirst, setVoiceFirst] = useState(false);
   const [step, setStep] = useState<Step>("welcome");
   const previousStep = useRef(step);
   useEffect(() => {
@@ -29,6 +28,11 @@ export default function Home() {
     document.getElementById("main-content")?.focus();
   }, [step]);
   const [profile, setProfile] = useState<CandidateProfile>(emptyProfile);
+  const interviewMode = profile.preferences.interviewMode ?? "voice";
+  const [voiceSessionActive, setVoiceSessionActive] = useState(false);
+  const [modeSwitchPending, setModeSwitchPending] = useState(false);
+  const [voiceAnswerToReview, setVoiceAnswerToReview] = useState<string | null>(null);
+  const [modeNotice, setModeNotice] = useState("");
   const [storageReady, setStorageReady] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"conversation" | "canvas">("conversation");
   const [chat, setChat] = useState<ConversationMessage[]>([]);
@@ -201,6 +205,24 @@ export default function Home() {
     setProfile((current) => ({ ...current, preferences: { ...current.preferences, questionStyle } }));
   }
 
+  function applyInterviewMode(mode: "voice" | "text") {
+    setProfile((current) => ({ ...current, preferences: { ...current.preferences, interviewMode: mode } }));
+    setModeSwitchPending(false);
+    setModeNotice(mode === "text"
+      ? "Your Live transcript and profile suggestions stay in this workspace. Text uses its own interview history."
+      : "Voice starts a new Live conversation. Your text history and shared Career Canvas stay in this workspace.");
+    if (mode === "text" && step === "story" && !chat.length && !pending) begin();
+  }
+
+  function selectInterviewMode(mode: "voice" | "text") {
+    if (mode === interviewMode) return;
+    if (interviewMode === "voice" && mode === "text" && voiceSessionActive) {
+      setModeSwitchPending(true);
+      return;
+    }
+    applyInterviewMode(mode);
+  }
+
   function navigateTo(nextStep: Step) {
     if (nextStep === "story") {
       begin();
@@ -303,7 +325,7 @@ export default function Home() {
     setAnnouncement(`${label} downloaded as ${filename}.`);
   }
 
-  function reviewVoiceAnswer(text: string) {
+  function addVoiceAnswerToText(text: string) {
     const combined = [message.trim(), text].filter(Boolean).join("\n\n");
     if (combined.length > 4000) {
       setAnnouncement("There is not enough space in the text field. Shorten your current answer before adding this voice answer.");
@@ -311,8 +333,31 @@ export default function Home() {
       return;
     }
     setMessage(combined); setCorrectionId(null); setError(""); setFailedRequest(null);
+    applyInterviewMode("text");
     setAnnouncement("Voice answer added to your text field. Review it before sending.");
-    messageInput.current?.focus();
+    requestAnimationFrame(() => messageInput.current?.focus());
+  }
+
+  function reviewVoiceAnswer(text: string) {
+    if (voiceSessionActive) {
+      setVoiceAnswerToReview(text);
+      setModeSwitchPending(true);
+      return;
+    }
+    applyInterviewMode("text");
+    addVoiceAnswerToText(text);
+  }
+
+  function confirmTextSwitch() {
+    const answer = voiceAnswerToReview;
+    setVoiceAnswerToReview(null);
+    applyInterviewMode("text");
+    if (answer !== null) addVoiceAnswerToText(answer);
+  }
+
+  function cancelTextSwitch() {
+    setVoiceAnswerToReview(null);
+    setModeSwitchPending(false);
   }
 
   function reset() {
@@ -321,7 +366,7 @@ export default function Home() {
     activeRequest.current?.abort(); activeRequest.current = null;
     activeCvImport.current?.abort(); activeCvImport.current = null; setCvImportPending(false); setCvImportError("");
     setPending(false); setError(""); setFailedRequest(null); setCorrectionId(null); setInterview(EMPTY_INTERVIEW);
-    setVoiceFirst(false); setStep("welcome"); setChat([]); setProfile(emptyProfile()); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setMobilePanel("conversation"); setCv(""); setLetter(""); setDraftJobId(null); setUnverifiedClaims([]); setApplicationError(""); setAnnouncement("Your session has been reset.");
+    setModeSwitchPending(false); setVoiceSessionActive(false); setVoiceAnswerToReview(null); setModeNotice(""); setStep("welcome"); setChat([]); setProfile(emptyProfile()); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setMobilePanel("conversation"); setCv(""); setLetter(""); setDraftJobId(null); setUnverifiedClaims([]); setApplicationError(""); setAnnouncement("Your session has been reset.");
   }
 
   return (
@@ -369,7 +414,7 @@ export default function Home() {
               </div>
               <p id="question-style-help">Choose one to begin. You can change this preference at any time.</p>
             </fieldset>
-            <div className="welcome-actions"><button className="button button-primary button-large" onClick={() => { setVoiceFirst(true); setStep("story"); setAnnouncement("Voice is off. Read the voice information, then explicitly start your microphone when ready."); }} disabled={!profile.preferences.questionStyle}>Start a conversation</button><button className="text-button" onClick={() => { setVoiceFirst(false); begin(); }} disabled={!profile.preferences.questionStyle}>I’d rather type</button></div><p className="sample-note">You choose when the microphone starts. Every suggestion is yours to review.</p>
+            <div className="welcome-actions"><button className="button button-primary button-large" onClick={() => { if (interviewMode === "text") begin(); else { setStep("story"); setAnnouncement("Voice is ready when you are. Starting it will request microphone permission."); } }} disabled={!profile.preferences.questionStyle}>{interviewMode === "text" ? "Continue in text" : "Start a conversation"}</button><button className="text-button" onClick={() => { if (interviewMode === "text") { applyInterviewMode("voice"); setStep("story"); } else { applyInterviewMode("text"); begin(); } }} disabled={!profile.preferences.questionStyle}>{interviewMode === "text" ? "Use voice instead" : "I’d rather type"}</button></div><p className="sample-note">You choose when the microphone starts. Every suggestion is yours to review.</p>
           </div>
           <HeroPreview />
           <div className="welcome-footer"><div><span className="footer-icon">01</span><span>Start with what you’ve done</span></div><div><span className="footer-icon">02</span><span>Review every suggestion</span></div><div><span className="footer-icon">03</span><span>Keep the final say</span></div></div>
@@ -380,9 +425,24 @@ export default function Home() {
           <div className="workspace-heading"><div><h1 id="story-heading">Your story, taking shape.</h1><p>Speak or write in your own words. Review what you discover, at your own pace.</p></div><span className="demo-tag"><span /> Gemini interview</span></div>
           <div className="mobile-switch" role="group" aria-label="Workspace panel"><button aria-pressed={mobilePanel === "conversation"} onClick={() => setMobilePanel("conversation")}>Conversation</button><button aria-pressed={mobilePanel === "canvas"} onClick={() => setMobilePanel("canvas")}>Career canvas <span className="count-pill">{claims.length}</span></button></div>
           <div className="workspace-grid">
-            <section className={`conversation-pane${mobilePanel === "canvas" ? " mobile-hidden" : ""}`} aria-labelledby="conversation-heading">
+            <section className={`conversation-pane${mobilePanel === "canvas" ? " mobile-mode-control-only" : ""}`} aria-labelledby="conversation-heading">
               <div className="pane-heading"><div><h2 id="conversation-heading">In your words</h2></div></div>
-              <LiveVoice initiallyOpen={voiceFirst} questionStyle={profile.preferences.questionStyle} available={!pending && mobilePanel === "conversation"} onSuggestions={addProfileSuggestions} onUseText={reviewVoiceAnswer} />
+              <fieldset className="interview-mode" aria-label="Interview mode">
+                <legend>Choose how to interview</legend>
+                <div>
+                  <label className={interviewMode === "voice" ? "is-selected" : ""}><input type="radio" name="interview-mode" value="voice" checked={interviewMode === "voice"} onChange={() => selectInterviewMode("voice")} /><span>Voice</span></label>
+                  <label className={interviewMode === "text" ? "is-selected" : ""}><input type="radio" name="interview-mode" value="text" checked={interviewMode === "text"} onChange={() => selectInterviewMode("text")} /><span>Text</span></label>
+                </div>
+              </fieldset>
+              {modeNotice && <p className="mode-notice" role="status">{modeNotice}</p>}
+              {modeSwitchPending && <div className="mode-switch-confirmation" role="alert" aria-labelledby="mode-switch-heading">
+                <p id="mode-switch-heading">{voiceAnswerToReview !== null ? "Stop the live voice conversation and switch to Text to review this answer?" : "Stop the live voice conversation and switch to Text?"}</p>
+                <p>{voiceAnswerToReview !== null ? "Microphone capture and playback will stop. This transcript will be added to the editable text field." : "Microphone capture and playback will stop. Completed answers and suggestions stay in your Career Canvas; an unfinished answer may not be saved."}</p>
+                <div><button className="button button-dark" onClick={confirmTextSwitch}>{voiceAnswerToReview !== null ? "Stop voice and review answer" : "Stop voice and switch"}</button><button className="text-button" onClick={cancelTextSwitch}>Keep using Voice</button></div>
+              </div>}
+              <div className={mobilePanel === "canvas" ? "mobile-interface-hidden" : ""}>
+              <LiveVoice visible={interviewMode === "voice" && mobilePanel === "conversation"} questionStyle={profile.preferences.questionStyle} available={interviewMode === "voice" && !pending && mobilePanel === "conversation"} onSessionActive={setVoiceSessionActive} onSuggestions={addProfileSuggestions} onUseText={reviewVoiceAnswer} />
+              {interviewMode === "text" && <>
               <div ref={chatLog} className={`chat-log${!chat.length ? " is-empty" : ""}`} role="region" tabIndex={chat.length ? 0 : -1} aria-label="Conversation history" aria-busy={pending}>
                 {chat.map((line) => <div key={line.id} className={`chat-line ${line.role === "user" ? "you" : "access"}`}><div className="avatar" aria-hidden="true">{line.role === "user" ? (profile.name?.[0] || "Y") : <Mark small />}</div><div><span className="speaker">{line.role === "user" ? "You" : "Access · Gemini"}</span><p>{line.content === CLARIFICATION_REQUEST ? "Could you clarify this question?" : line.content}</p>{line.role === "user" && !["[Question skipped by candidate]", CLARIFICATION_REQUEST].includes(line.content) && <button className="text-button" disabled={pending || interview.status === "ended"} onClick={() => { setCorrectionId(line.id); setMessage(line.content); setError(""); setFailedRequest(null); messageInput.current?.focus(); }}>Correct this answer</button>}</div></div>)}
               </div>
@@ -393,6 +453,8 @@ export default function Home() {
               <div className="prompt-row">
                 {interview.status !== "ended" ? <><button className="text-button" disabled={pending || !chat.length || !!correctionId} onClick={() => void requestTurn({ action: "skip", history: chat, questionStyle: profile.preferences.questionStyle! })}>Skip question</button><button className="text-button" disabled={pending || !chat.length || !!correctionId || chat.at(-1)?.role !== "assistant" || chat.at(-2)?.content === CLARIFICATION_REQUEST} onClick={clarifyQuestion}>Clarify question</button><button className="text-button" onClick={endInterview}>End interview</button></> : <button className="text-button" disabled={pending || !profile.preferences.questionStyle} onClick={startNewInterview}>Start a new interview</button>}
                 {correctionId && <button className="text-button" disabled={pending} onClick={() => { setCorrectionId(null); setMessage(""); setError(""); setFailedRequest(null); }}>Cancel correction</button>}
+              </div>
+              </>}
               </div>
             </section>
 

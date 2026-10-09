@@ -247,7 +247,7 @@ try {
     assert.equal(await page.getByLabel('Higher contrast').isChecked(), true);
     assert.equal(await page.getByLabel('Reduce motion').isChecked(), true);
     await activate(page.locator('.preferences summary'));
-    await activate(page.getByRole('button', { name: 'I’d rather type' }));
+    await activate(page.getByRole('button', { name: 'Continue in text', exact: true }));
     await page.getByText('What experience would you like to share?', { exact: true }).waitFor();
     if (width <= 650) await activate(page.getByRole('button', { name: /Career canvas/ }));
     assert.equal(await page.getByLabel('Confirmed skill').count(), 2);

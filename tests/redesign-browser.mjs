@@ -25,9 +25,17 @@ try {
     await page.getByRole('radio', { name: /Simple/ }).check();
     await page.getByRole('button', { name: 'Start a conversation', exact: true }).click();
     await page.locator('.voice-stage[data-voice-state="idle"]').waitFor();
+    assert.equal(await page.getByRole('radio', { name: 'Voice' }).isChecked(), true, 'Voice is the default mode');
+    assert.equal(await page.getByRole('radio', { name: 'Text' }).isChecked(), false);
+    assert.equal(await page.locator('#message').count(), 0, 'Text interface is absent in Voice mode');
+    const transcript = page.getByRole('button', { name: 'View transcript (0 turns)' });
+    assert.equal(await transcript.getAttribute('aria-expanded'), 'false', 'Transcript starts collapsed');
+    await transcript.focus(); await page.keyboard.press('Space');
+    assert.equal(await page.getByRole('button', { name: 'Collapse transcript' }).getAttribute('aria-expanded'), 'true', 'Transcript disclosure works from the keyboard');
+    await page.getByRole('button', { name: 'Collapse transcript' }).click();
     assert.equal(await page.evaluate(() => window.micRequests), 0, 'Voice route requires a second explicit microphone action');
     assert.equal(providerRequests, 0, 'Voice route does not start a text interview');
-    await page.getByRole('button', { name: 'Start voice & allow microphone' }).click();
+    await page.getByRole('button', { name: 'Start conversation', exact: true }).last().click();
     await page.getByRole('alert').filter({ hasText: 'Microphone permission was not granted' }).waitFor();
     microphoneRequests = await page.evaluate(() => window.micRequests);
     assert.equal(microphoneRequests, 1);

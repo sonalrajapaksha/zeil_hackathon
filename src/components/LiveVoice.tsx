@@ -8,7 +8,7 @@ import { encodePcm, decodePcm } from '@/lib/live-audio';
 import type { LiveServerMessage } from '@google/genai';
 
 type VoiceTurn = { id: string; answer: string; status: 'queued' | 'done' | 'error'; error?: string };
-type Transcript = { role: 'You' | 'Access · Gemini Live'; text: string };
+type Transcript = { role: 'You' | 'Access · Gemini Live'; text: string; finalized: boolean };
 type Resources = {
   cancelled: boolean; ready: boolean; muted: boolean; controller: AbortController;
   stream?: MediaStream; context?: AudioContext; source?: MediaStreamAudioSourceNode;
@@ -16,15 +16,15 @@ type Resources = {
   sources: Set<AudioBufferSourceNode>; nextPlay: number; answer: VoiceAnswerBuffer;
 };
 
-export function LiveVoice({ questionStyle, available, onUseText, onSuggestions, initiallyOpen = false }: {
-  onSuggestions: (items: ProfileSuggestion[]) => void; initiallyOpen?: boolean; questionStyle?: 'simple' | 'standard'; available: boolean; onUseText: (text: string) => void;
+export function LiveVoice({ questionStyle, available, visible, onSessionActive, onUseText, onSuggestions }: {
+  onSuggestions: (items: ProfileSuggestion[]) => void; questionStyle?: 'simple' | 'standard'; available: boolean; visible: boolean; onSessionActive: (active: boolean) => void; onUseText: (text: string) => void;
 }) {
-  const [open, setOpen] = useState(initiallyOpen);
   const [state, setState] = useState<'idle' | 'connecting' | 'live'>('idle');
   const [status, setStatus] = useState('Voice is off.');
   const [error, setError] = useState('');
   const [muted, setMuted] = useState(false);
   const [transcript, setTranscript] = useState<Transcript[]>([]);
+  const [transcriptExpanded, setTranscriptExpanded] = useState(false);
   const [voiceTurns, setVoiceTurns] = useState<VoiceTurn[]>([]);
   const [answerNotice, setAnswerNotice] = useState('');
   const nextTurn = voiceTurns.find((turn) => turn.status === 'queued');
@@ -90,13 +90,14 @@ export function LiveVoice({ questionStyle, available, onUseText, onSuggestions, 
     resources.current = null;
     if (current) dispose(current);
     transcriptRole.current = null;
-    setState('idle'); setMuted(false); setStatus(message); setError(failure);
+    setState('idle'); setMuted(false); setStatus(message); setError(failure); onSessionActive(false);
   }
   useEffect(() => () => {
     const current = resources.current;
     resources.current = null;
     if (current) dispose(current);
-  }, []);
+    onSessionActive(false);
+  }, [onSessionActive]);
   useEffect(() => {
     if (resources.current) stop('Voice stopped because your question style or workspace changed. Your text is unchanged.');
   }, [questionStyle, available]);
@@ -114,7 +115,7 @@ export function LiveVoice({ questionStyle, available, onUseText, onSuggestions, 
     const path = waveform.current;
     const flat = 'M0 40 L240 40';
     path?.setAttribute('d', flat);
-    if (state !== 'live' || muted || !open || !current?.source || !current.context || !path) return;
+    if (state !== 'live' || muted || !current?.source || !current.context || !path) return;
     const analyser = current.context.createAnalyser();
     analyser.fftSize = 256;
     const samples = new Float32Array(analyser.fftSize);
@@ -146,7 +147,7 @@ export function LiveVoice({ questionStyle, available, onUseText, onSuggestions, 
       analyser.disconnect();
       path.setAttribute('d', flat);
     };
-  }, [state, muted, open]);
+  }, [state, muted]);
 
   function append(role: Transcript['role'], text: string) {
     const continuing = transcriptRole.current === role;
@@ -154,20 +155,21 @@ export function LiveVoice({ questionStyle, available, onUseText, onSuggestions, 
     setTranscript((previous) => {
       const next = [...previous];
       if (continuing && next.at(-1)?.role === role) {
-        next[next.length - 1] = { role, text: (next.at(-1)!.text + text).slice(0, 4000) };
-      } else next.push({ role, text: text.slice(0, 4000) });
+        next[next.length - 1] = { role, text: (next.at(-1)!.text + text).slice(0, 4000), finalized: false };
+      } else next.push({ role, text: text.slice(0, 4000), finalized: false });
       return next.slice(-40);
     });
   }
   async function start() {
     if (resources.current || !available || !questionStyle) return;
-    setError(''); setMuted(false); setTranscript([]); transcriptRole.current = null;
+    setError(''); setMuted(false); transcriptRole.current = null;
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || !window.AudioWorkletNode) {
       setError('Live voice needs a browser with microphone and audio support on HTTPS or localhost. Continue by text.');
       return;
     }
     const current: Resources = { cancelled: false, ready: false, muted: false, controller: new AbortController(), sources: new Set(), nextPlay: 0, answer: { text: '', overflow: false, suppressed: false, interrupted: false } };
     resources.current = current;
+    onSessionActive(true);
     const valid = () => resources.current === current && !current.cancelled;
     const fail = () => { if (valid()) stop('Voice is off.', 'Voice disconnected. Retry voice or continue by text. Your text and profile are unchanged.'); };
     setState('connecting'); setStatus('Waiting for microphone permission.');
@@ -227,7 +229,10 @@ export function LiveVoice({ questionStyle, available, onUseText, onSuggestions, 
             const turn: VoiceTurn = { id: crypto.randomUUID(), answer: completed.answer, status: 'queued' };
             setVoiceTurns((turns) => turns.length < INTERVIEW_LIMIT ? [...turns, turn] : turns);
           }
-          if (content.turnComplete) transcriptRole.current = null;
+          if (content.turnComplete) {
+            transcriptRole.current = null;
+            setTranscript((previous) => previous.map((line) => ({ ...line, finalized: true })));
+          }
         } catch { fail(); }
       };
       // Native WebSocket lets Stop also close a socket still awaiting setup.
@@ -298,10 +303,10 @@ export function LiveVoice({ questionStyle, available, onUseText, onSuggestions, 
 
   const visualState = error ? 'error' : state === 'connecting' ? 'connecting' : state === 'idle' ? 'idle' : resources.current?.sources.size ? 'speaking' : muted ? 'muted' : status.startsWith('Interrupted.') ? 'interrupted' : 'listening';
   const currentQuestion = transcript.filter((line) => line.role === 'Access · Gemini Live').at(-1)?.text;
+  if (!visible) return null;
   return <section className="live-voice" aria-labelledby="live-heading">
-    <h3 id="live-heading"><button type="button" className="text-button" aria-expanded={open} aria-controls="live-controls" onClick={() => { if (open) stop(); setOpen(!open); }}>Voice conversation</button></h3>
-    {open && <div id="live-controls">
-      <p>Talk with Gemini Live and hear its replies. Starting requests microphone permission and sends audio directly to Google Gemini. Completed voice answers are also sent to Gemini to suggest skills, experience and education in your Career Canvas. Review and approve each suggestion before it can appear in a draft. Access does not record audio or save the full transcript.</p>
+      <h3 id="live-heading">Voice conversation</h3>
+      <p className="voice-consent">Start only when you’re ready. Gemini receives your microphone audio and creates a transcript; completed answers can suggest profile details for your review. Access does not save audio or the full transcript.</p>
       <div ref={stage} className="voice-stage" data-voice-state={visualState}>
         <div className="voice-signal" aria-hidden="true"><span /><span /><span /><svg viewBox="0 0 240 80"><path ref={waveform} d="M0 40 L240 40" /></svg></div>
         <p className="voice-state-label">{visualState === 'speaking' ? 'Access is speaking' : visualState === 'listening' ? 'Listening · microphone on' : visualState === 'interrupted' ? 'Interrupted · listening to you' : visualState === 'muted' ? 'Microphone muted' : visualState === 'connecting' ? 'Getting connected' : visualState === 'error' ? 'Let’s try again' : 'Ready when you are'}</p>
@@ -310,7 +315,7 @@ export function LiveVoice({ questionStyle, available, onUseText, onSuggestions, 
       <p role="status">{status}</p>
       {error && <p role="alert">{error}</p>}
       <div className="live-actions">
-        <button ref={startButton} type="button" className="button button-dark" disabled={active || !available || !questionStyle} onClick={() => void start()}>Start voice &amp; allow microphone</button>
+        <button ref={startButton} type="button" className="button button-dark" disabled={active || !available || !questionStyle} onClick={() => void start()}>Start conversation</button>
         <button type="button" className="text-button" disabled={state !== 'live'} aria-pressed={muted} onClick={toggleMute}>{muted ? 'Unmute microphone' : 'Mute microphone'}</button>
         <button type="button" className="text-button" disabled={!active} onClick={() => { stop(); startButton.current?.focus(); }}>Stop voice</button>
       </div>
@@ -320,8 +325,14 @@ export function LiveVoice({ questionStyle, available, onUseText, onSuggestions, 
         {failedTurn && <div role="alert"><p>{failedTurn.error}</p><button type="button" className="text-button" onClick={() => setVoiceTurns((turns) => turns.map((turn) => turn.status === 'error' ? { ...turn, status: 'queued', error: undefined } : turn))}>Retry voice suggestions</button></div>}
         {voiceTurns.length >= INTERVIEW_LIMIT && <p>Automatic suggestions cover up to {INTERVIEW_LIMIT} voice answers in this workspace. You can continue sharing details by text.</p>}
       </div>
-      {transcript.length > 0 && <details className="transcript-disclosure" open><summary>Live transcript · {transcript.length} turns</summary><div className="live-transcript" role="region" tabIndex={0} aria-label="Voice practice transcript"><p>Automatic transcript · text may still be arriving. Check for mistakes before using an answer.</p>{transcript.map((line, index) => <div key={index}><strong>{line.role}</strong><p>{line.text}</p>{line.role === 'You' && <button type="button" className="text-button" onClick={() => { stop(); onUseText(line.text); }}>Review this answer in text</button>}</div>)}</div></details>}
-      <p>You can stop and use the text controls below at any time. Voice suggestions stay unconfirmed until you approve them. You can also review an answer in text to correct transcription mistakes.</p>
-    </div>}
+      <div className="transcript-disclosure">
+        <button type="button" className="transcript-toggle" aria-expanded={transcriptExpanded} aria-controls="live-transcript" onClick={() => setTranscriptExpanded((expanded) => !expanded)}>{transcriptExpanded ? 'Collapse transcript' : `View transcript (${transcript.length} ${transcript.length === 1 ? 'turn' : 'turns'})`}</button>
+        <div id="live-transcript" className="live-transcript" role="region" tabIndex={0} aria-label="Voice conversation transcript" hidden={!transcriptExpanded}>
+          <p>Automatic transcript. Check for mistakes before using an answer.</p>
+          {transcript.length === 0 && <p>No transcript turns yet.</p>}
+          {transcript.map((line, index) => <div key={index}><strong>{line.role}</strong><span className="transcript-state">{line.finalized ? 'Final' : 'Partial'}</span><p>{line.text}</p>{line.role === 'You' && <button type="button" className="text-button" onClick={() => onUseText(line.text)}>Review this answer in text</button>}</div>)}
+        </div>
+      </div>
+      <p>Voice suggestions stay unconfirmed until you approve them. Review a candidate answer in text if its transcript needs correction.</p>
   </section>;
 }

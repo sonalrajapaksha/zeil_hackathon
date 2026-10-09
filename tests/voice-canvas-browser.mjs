@@ -55,8 +55,9 @@ try {
     await page.goto(baseURL);
     await page.getByRole('radio', { name: /Simple/ }).check();
     await page.getByRole('button', { name: 'Start a conversation', exact: true }).click();
-    await page.getByRole('button', { name: 'Start voice & allow microphone' }).click();
+    await page.getByRole('button', { name: 'Start conversation', exact: true }).last().click();
     await page.locator('.voice-stage[data-voice-state="listening"]').waitFor();
+    await page.getByRole('button', { name: 'View transcript (0 turns)' }).click();
     const send = (serverContent) => socket.send(JSON.stringify({ serverContent }));
     send({ inputTranscription: { text: 'I helped library ' } });
     send({ outputTranscription: { text: 'The interviewer says CEO, which is not candidate evidence.' } });
@@ -66,7 +67,7 @@ try {
     await page.getByText('Voice suggestions are ready in your Career Canvas. Review each one before approving.', { exact: true }).waitFor();
     assert.deepEqual(requests, [{ answer: libraryAnswer }], 'Only completed candidate input is sent');
     assert.equal(textCalls, 0, 'Voice does not require the text interview');
-    assert.equal(await page.locator('#message').inputValue(), '', 'Unsent text is not changed');
+    assert.equal(await page.locator('#message').count(), 0, 'Text controls remain hidden during voice');
     assert.equal(await page.locator('.chat-line').count(), 0);
     send({ turnComplete: true }); send({ turnComplete: true });
     await page.waitForTimeout(100);
@@ -86,7 +87,7 @@ try {
     await page.screenshot({ path: `/tmp/access-voice-canvas-${width}.png`, fullPage: true });
     if (width <= 650) await page.getByRole('button', { name: 'Conversation', exact: true }).click();
     // Mobile panel switching intentionally stops voice; restart uses existing controls.
-    if (width <= 650) { await page.getByRole('button', { name: 'Start voice & allow microphone' }).click(); await page.locator('.voice-stage[data-voice-state="listening"]').waitFor(); }
+    if (width <= 650) { await page.getByRole('button', { name: 'Start conversation', exact: true }).click(); await page.locator('.voice-stage[data-voice-state="listening"]').waitFor(); }
     failNext = true;
     send({ inputTranscription: { text: 'I organised bookings.', finished: true } });
     await page.getByRole('button', { name: 'Retry voice suggestions' }).waitFor();
@@ -120,7 +121,7 @@ try {
     await page.getByRole('button', { name: 'Reset & delete' }).click();
     await page.getByRole('radio', { name: /Simple/ }).check();
     await page.getByRole('button', { name: 'Start a conversation', exact: true }).click();
-    await page.getByRole('button', { name: 'Start voice & allow microphone' }).click();
+    await page.getByRole('button', { name: 'Start conversation', exact: true }).last().click();
     await page.locator('.voice-stage[data-voice-state="listening"]').waitFor();
     hold = true;
     send({ inputTranscription: { text: 'I organised bookings.', finished: true } });

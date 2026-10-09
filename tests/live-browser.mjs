@@ -44,16 +44,19 @@ try {
     await page.goto(baseURL);
     await page.getByRole('radio', { name: /Simple/ }).check();
     await page.getByRole('button', { name: 'I’d rather type' }).click();
-    await page.getByRole('button', { name: 'Voice conversation' }).focus(); await page.keyboard.press('Enter');
-    const start = page.getByRole('button', { name: 'Start voice & allow microphone' });
     await page.locator('#message').fill('My unsent answer stays here.');
+    await page.getByRole('radio', { name: 'Voice' }).check();
+    const start = page.getByRole('button', { name: 'Start conversation', exact: true });
+    assert.equal(await page.locator('#message').count(), 0, 'Text controls are hidden in Voice mode');
     // Denial preserves candidate input and allows immediate text fallback.
     await page.evaluate(() => { window.denyMic = true; });
     await start.focus(); await page.keyboard.press('Enter');
     await page.getByRole('alert').filter({ hasText: 'Microphone permission was not granted' }).waitFor();
     assert.equal(await page.locator('.voice-signal svg').evaluate((el) => getComputedStyle(el).stroke), 'rgb(180, 35, 44)', 'Microphone denial turns the signal red');
+    await page.getByRole('radio', { name: 'Text' }).check();
     assert.equal(await page.locator('#message').inputValue(), 'My unsent answer stays here.');
     await page.evaluate(() => { window.denyMic = false; });
+    await page.getByRole('radio', { name: 'Voice' }).check();
     tokenFails = true;
     await start.click();
     await page.getByRole('alert').filter({ hasText: 'Voice is unavailable' }).waitFor();
@@ -90,6 +93,8 @@ try {
     await page.getByRole('button', { name: 'Clarify voice question' }).click();
     assert.ok(messages.some((message) => JSON.stringify(message.clientContent ?? {}).includes('clarify')));
     // A long queued PCM frame must stop immediately on interruption.
+    await page.getByRole('button', { name: /View transcript/ }).click();
+    await page.getByRole('region', { name: 'Voice conversation transcript' }).focus();
     const pcm = Buffer.alloc(24000 * 2 * 3).toString('base64');
     socket.send(JSON.stringify({ serverContent: { inputTranscription: { text: 'I helped library visitors.' }, outputTranscription: { text: 'What did you enjoy?' }, modelTurn: { parts: [{ inlineData: { data: pcm, mimeType: 'audio/pcm;rate=24000' } }] } } }));
     await page.getByText('I helped library visitors.', { exact: true }).waitFor();
@@ -101,20 +106,24 @@ try {
     await page.locator('.voice-stage[data-voice-state="interrupted"]').waitFor();
     await page.screenshot({ path: `/tmp/access-task13-${width}.png`, fullPage: true });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
-    await page.getByRole('region', { name: 'Voice practice transcript' }).focus();
     socket.send(JSON.stringify({ serverContent: { outputTranscription: { text: ' Here is more context.'.repeat(100) }, turnComplete: true } }));
     await page.waitForFunction(() => document.querySelector('.voice-question').textContent.length > 1000);
-    assert.equal(await page.getByRole('region', { name: 'Voice practice transcript' }).evaluate((el) => el === document.activeElement), true, 'Streaming preserves transcript focus');
-    assert.equal(await page.getByRole('region', { name: 'Voice practice transcript' }).getAttribute('aria-live'), null, 'Partial transcripts do not flood announcements');
+    assert.equal(await page.getByRole('region', { name: 'Voice conversation transcript' }).evaluate((el) => el === document.activeElement), true, 'Streaming preserves transcript focus');
+    assert.equal(await page.getByRole('region', { name: 'Voice conversation transcript' }).getAttribute('aria-live'), null, 'Partial transcripts do not flood announcements');
     assert.equal(await page.locator('.voice-question').evaluate((el) => el.clientHeight < el.scrollHeight), true, 'Long current turn scrolls without displacing stop controls');
     await page.getByRole('button', { name: 'Review this answer in text' }).click();
+    await page.getByText('Stop the live voice conversation and switch to Text to review this answer?', { exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => window.liveTracks.some((track) => track.readyState === 'live')), true, 'Transcript handoff requires confirmation before stopping voice');
+    await page.getByRole('button', { name: 'Stop voice and review answer' }).click();
+    await page.locator('#message').waitFor();
     assert.equal(await page.locator('#message').inputValue(), 'My unsent answer stays here.\n\nI helped library visitors.');
-    assert.equal(await page.locator('#message').evaluate((el) => el === document.activeElement), true);
+    await page.waitForFunction(() => document.querySelector('#message') === document.activeElement, null, { timeout: 2000 });
     await page.waitForFunction(() => window.liveTracks.every((track) => track.readyState === 'ended'));
     assert.equal(closed, true);
     // Stop must cancel a pending socket even before Gemini sends setupComplete.
     holdSetup = true;
     const setupCount = messages.filter((message) => message.setup).length;
+    await page.getByRole('radio', { name: 'Voice' }).check();
     await start.click();
     await page.getByText('Connecting to Gemini Live.', { exact: true }).waitFor();
     for (let attempt = 0; attempt < 50 && messages.filter((message) => message.setup).length === setupCount; attempt++) await page.waitForTimeout(100);
@@ -122,20 +131,26 @@ try {
     await page.getByRole('button', { name: 'Stop voice' }).click();
     await page.waitForFunction(() => window.liveTracks.every((track) => track.readyState === 'ended'));
     assert.equal(closed, true);
+    await page.getByRole('radio', { name: 'Text' }).check();
     assert.equal(await page.locator('#message').inputValue(), 'My unsent answer stays here.\n\nI helped library visitors.');
     holdSetup = false;
     // Remote closure is recoverable, then Reset releases the next session.
+    await page.getByRole('radio', { name: 'Voice' }).check();
     await start.click();
     await page.waitForFunction(() => !document.querySelector('.live-actions button[aria-pressed]').disabled);
     socket.close({ code: 1011, reason: 'fixture provider failure' });
     await page.getByText('Voice connection ended. Retry voice or continue by text.', { exact: true }).waitFor();
+    await page.getByRole('radio', { name: 'Text' }).check();
     assert.equal(await page.locator('#message').inputValue(), 'My unsent answer stays here.\n\nI helped library visitors.');
+    await page.getByRole('radio', { name: 'Voice' }).check();
     await start.click();
     await page.waitForFunction(() => !document.querySelector('.live-actions button[aria-pressed]').disabled);
     await page.locator('.preferences summary').click();
     await page.getByRole('radio', { name: 'Standard', exact: true }).check();
     await page.waitForFunction(() => window.liveTracks.every((track) => track.readyState === 'ended'));
+    await page.getByRole('radio', { name: 'Text' }).check();
     assert.equal(await page.locator('#message').inputValue(), 'My unsent answer stays here.\n\nI helped library visitors.');
+    await page.getByRole('radio', { name: 'Voice' }).check();
     await page.locator('.preferences summary').click();
     await start.click();
     await page.waitForFunction(() => !document.querySelector('.live-actions button[aria-pressed]').disabled);
