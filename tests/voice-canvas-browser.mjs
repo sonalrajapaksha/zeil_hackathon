@@ -76,7 +76,12 @@ try {
     for (let attempt = 0; attempt < 40 && requests.length < 2; attempt++) await page.waitForTimeout(25);
     assert.equal(requests.length, 2);
     await page.waitForFunction(() => !document.querySelector('.voice-discovery').textContent.includes('Discovering'));
-    if (width <= 650) await page.getByRole('button', { name: /Career canvas/ }).click();
+    const canvasSummary = page.locator('.canvas-companion > summary');
+    assert.equal(await page.locator('.canvas-companion').evaluate((element) => element.open), false, 'Career profile stays compact during the conversation');
+    await canvasSummary.waitFor();
+    assert.match(await canvasSummary.innerText(), /1 experience · 1 skill/);
+    assert.match(await canvasSummary.innerText(), /3 awaiting review/);
+    await canvasSummary.click();
     await page.getByLabel('Suggested skill').waitFor();
     assert.equal(await page.locator('.note-item').count(), 3, 'Repeated evidence does not duplicate cards');
     assert.equal(await page.getByLabel('Suggested education').inputValue(), 'Mathematics study');
@@ -85,9 +90,6 @@ try {
     await page.locator('.note-item').filter({ has: page.getByLabel('Suggested skill') }).getByRole('button', { name: 'Approve' }).click();
     await page.getByLabel('Confirmed skill').waitFor();
     await page.screenshot({ path: `/tmp/access-voice-canvas-${width}.png`, fullPage: true });
-    if (width <= 650) await page.getByRole('button', { name: 'Conversation', exact: true }).click();
-    // Mobile panel switching intentionally stops voice; restart uses existing controls.
-    if (width <= 650) { await page.getByRole('button', { name: 'Start conversation', exact: true }).click(); await page.locator('.voice-stage[data-voice-state="listening"]').waitFor(); }
     failNext = true;
     send({ inputTranscription: { text: 'I organised bookings.', finished: true } });
     await page.getByRole('button', { name: 'Retry voice suggestions' }).waitFor();
@@ -101,7 +103,6 @@ try {
     send({ inputTranscription: { text: 'Could you clarify?', finished: true }, turnComplete: true });
     await page.waitForTimeout(100); assert.equal(requests.length, beforeClarify);
     await page.getByRole('button', { name: 'Stop voice' }).click();
-    if (width <= 650) await page.getByRole('button', { name: /Career canvas/ }).click();
     await page.getByRole('button', { name: 'Choose a role' }).click();
     await page.getByRole('button', { name: 'Prepare application draft' }).click();
     await page.getByLabel('Curriculum vitae').waitFor();

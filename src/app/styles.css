@@ -140,3 +140,46 @@ input,textarea{caret-color:var(--purple-dark)}
 .voice-stage .voice-state-label{color:var(--signal-color)}
 .voice-stage[data-voice-state=error] .voice-signal{opacity:1}
 .voice-stage[data-voice-state=speaking] .voice-signal>span{background:transparent}
+
+/* The interview leads; the complete career editor opens only when requested. */
+.workspace{max-width:1320px}
+.workspace-heading{margin-bottom:18px}
+.workspace-heading h1{font-size:clamp(38px,5vw,64px);line-height:1.08;letter-spacing:-.04em}
+.workspace-heading>div>p:last-child{max-width:62ch}
+.workspace-grid{grid-template-columns:minmax(0,1.65fr) minmax(260px,1fr);align-items:start;gap:clamp(28px,5vw,72px)}
+.conversation-pane{padding:0}
+.interview-mode{margin:0 0 16px}
+.interview-mode legend{font-size:15px;margin-bottom:8px}
+.interview-mode>div{border:0;background:transparent;gap:8px}
+.interview-mode label{min-width:112px;border:1px solid var(--line)!important;background:var(--white)}
+.interview-mode label:first-child{border-left:1px solid var(--line)!important}
+.interview-mode label.is-selected{border-color:var(--purple-dark)!important}
+.interview-mode label.is-selected span{background:var(--purple-wash);color:var(--ink)}
+.interview-mode label span{min-height:44px}
+.canvas-companion{align-self:start;min-width:0}
+.canvas-companion>summary{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-height:44px;padding:18px 0;border-block:1px solid var(--line);list-style:none;cursor:pointer}
+.canvas-companion>summary::-webkit-details-marker{display:none}
+.canvas-summary-title{font:600 24px/1.2 var(--display);letter-spacing:-.025em;color:var(--ink)}
+.canvas-summary-counts,.canvas-summary-review,.canvas-summary-latest{font-size:15px;line-height:1.5;color:var(--ink)}
+.canvas-summary-review.has-review{font-weight:700;color:var(--purple-dark)}
+.canvas-summary-latest{max-width:100%;overflow-wrap:anywhere;color:var(--muted)}
+.canvas-summary-action{min-height:44px;display:flex;align-items:center;color:var(--purple-dark);font-weight:700;text-decoration:underline;text-underline-offset:4px}
+.canvas-companion>summary:focus-visible{outline:3px solid var(--focus);outline-offset:4px}
+.canvas-companion[open] .canvas-pane{margin-top:20px;padding:18px 0 0;background:transparent;border:0;border-top:1px solid var(--line)}
+.canvas-companion[open] .canvas-title{border:0;padding:0;min-height:unset}
+.canvas-companion[open] .candidate-line{padding-top:12px}
+.canvas-companion[open] .cv-import{padding:12px 0;border:0;border-block:1px solid var(--line);background:transparent}
+.canvas-companion[open] .cv-import>p{font-size:14px}
+.canvas-companion[open] .section-label{display:flex;flex-wrap:wrap;gap:6px 16px}
+.voice-stage{margin-top:14px}
+.live-voice{margin-top:8px}
+.live-voice h3{font:600 22px/1.25 var(--display);margin:0 0 8px}
+.live-voice .voice-consent{max-width:62ch;margin-bottom:12px;font-size:15px}
+.transcript-toggle{text-decoration:none}
+.transcript-toggle:hover{text-decoration:underline}
+.high-contrast .canvas-companion>summary{border-color:#000}
+.high-contrast .canvas-summary-review.has-review,.high-contrast .canvas-summary-action{color:#000;text-decoration:underline}
+.large-text .canvas-summary-title{font-size:1.15em}
+.large-text .canvas-summary-counts,.large-text .canvas-summary-review,.large-text .canvas-summary-latest{font-size:1em}
+@media(max-width:1024px){.workspace-grid{grid-template-columns:minmax(0,1.5fr) minmax(240px,1fr);gap:24px}}
+@media(max-width:650px){.workspace{padding-top:30px}.workspace-heading{margin-bottom:14px}.workspace-heading h1{font-size:clamp(36px,9vw,48px)}.workspace-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:22px}.canvas-companion{width:100%}.canvas-companion>summary{padding:14px 0}.canvas-companion[open] .canvas-pane{padding-top:16px}.interview-mode{margin-bottom:12px}.interview-mode>div{width:auto}.interview-mode label{flex:0 1 140px}.live-actions .button{width:auto}.voice-stage{padding:22px 16px}}

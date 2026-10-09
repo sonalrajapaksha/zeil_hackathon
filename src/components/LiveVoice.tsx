@@ -305,8 +305,8 @@ export function LiveVoice({ questionStyle, available, visible, onSessionActive, 
   const currentQuestion = transcript.filter((line) => line.role === 'Access · Gemini Live').at(-1)?.text;
   if (!visible) return null;
   return <section className="live-voice" aria-labelledby="live-heading">
-      <h3 id="live-heading">Voice conversation</h3>
-      <p className="voice-consent">Start only when you’re ready. Gemini receives your microphone audio and creates a transcript; completed answers can suggest profile details for your review. Access does not save audio or the full transcript.</p>
+      <h3 id="live-heading">Speak with Access</h3>
+      <p className="voice-consent">Start when you’re ready. Gemini receives your microphone audio; completed answers may suggest profile details for your review. Access does not save audio or the full transcript.</p>
       <div ref={stage} className="voice-stage" data-voice-state={visualState}>
         <div className="voice-signal" aria-hidden="true"><span /><span /><span /><svg viewBox="0 0 240 80"><path ref={waveform} d="M0 40 L240 40" /></svg></div>
         <p className="voice-state-label">{visualState === 'speaking' ? 'Access is speaking' : visualState === 'listening' ? 'Listening · microphone on' : visualState === 'interrupted' ? 'Interrupted · listening to you' : visualState === 'muted' ? 'Microphone muted' : visualState === 'connecting' ? 'Getting connected' : visualState === 'error' ? 'Let’s try again' : 'Ready when you are'}</p>
@@ -333,6 +333,5 @@ export function LiveVoice({ questionStyle, available, visible, onSessionActive, 
           {transcript.map((line, index) => <div key={index}><strong>{line.role}</strong><span className="transcript-state">{line.finalized ? 'Final' : 'Partial'}</span><p>{line.text}</p>{line.role === 'You' && <button type="button" className="text-button" onClick={() => onUseText(line.text)}>Review this answer in text</button>}</div>)}
         </div>
       </div>
-      <p>Voice suggestions stay unconfirmed until you approve them. Review a candidate answer in text if its transcript needs correction.</p>
   </section>;
 }

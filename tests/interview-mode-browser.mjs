@@ -36,14 +36,17 @@ try {
   await page.goto(baseURL);
   await page.getByRole('radio', { name: /Simple/ }).check();
   await page.getByRole('button', { name: 'Start a conversation', exact: true }).click();
-  assert.equal(await page.getByRole('radio', { name: 'Voice' }).isChecked(), true, 'No saved choice defaults to Voice');
+  assert.equal(await page.getByRole('radio', { name: 'Speak' }).isChecked(), true, 'No saved choice defaults to Voice');
   assert.equal(conversationRequests, 0, 'Selecting Voice does not start the text interview');
   assert.equal(liveTokenRequests, 0, 'Selecting Voice does not open Gemini Live');
   assert.equal(await page.evaluate(() => window.liveTracks.length), 0, 'Selecting Voice does not request the microphone');
   assert.equal(await page.locator('#message').count(), 0, 'Text interface is absent in Voice mode');
   assert.equal(await page.getByRole('button', { name: 'View transcript (0 turns)' }).getAttribute('aria-expanded'), 'false');
+  assert.equal(await page.locator('.canvas-companion').evaluate((element) => element.open), false, 'Career editor starts compact');
+  await page.locator('.canvas-companion > summary').click();
+  assert.equal(await page.locator('.canvas-companion').evaluate((element) => element.open), true, 'Career profile opens on request');
 
-  await page.getByRole('radio', { name: 'Text' }).click();
+  await page.locator('.interview-mode label').filter({ hasText: 'Type' }).click();
   await page.getByText('What work would you like to share?', { exact: true }).waitFor();
   assert.equal(await page.locator('.voice-stage').count(), 0, 'Voice interface is absent in Text mode');
   await page.getByLabel('Add to your story').fill('I organized weekly events.');
@@ -55,7 +58,7 @@ try {
   await page.getByLabel('Add to your story').fill('An unsent text note.');
 
   const requestCount = conversationRequests;
-  await page.getByRole('radio', { name: 'Voice' }).check();
+  await page.locator('.interview-mode label').filter({ hasText: 'Speak' }).click();
   assert.equal(conversationRequests, requestCount, 'Switching to Voice does not send the text history');
   assert.equal(liveTokenRequests, 0, 'Switching to Voice still requires an explicit start action');
   assert.equal(await page.locator('#message').count(), 0);
@@ -68,12 +71,12 @@ try {
   assert.equal(await page.getByRole('button', { name: 'View transcript (1 turn)' }).getAttribute('aria-expanded'), 'false', 'Transcript stays collapsed during voice activity');
   await page.screenshot({ path: '/tmp/access-interview-voice-1280.png', fullPage: true });
 
-  await page.getByRole('radio', { name: 'Text' }).click();
+  await page.locator('.interview-mode label').filter({ hasText: 'Type' }).click();
   await page.getByText('Stop the live voice conversation and switch to Text?', { exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.liveTracks.some((track) => track.readyState === 'live')), true, 'Voice is not stopped before confirmation');
   await page.getByRole('button', { name: 'Keep using Voice' }).click();
   assert.equal(await page.getByRole('button', { name: 'Mute microphone' }).isEnabled(), true, 'Cancel keeps the session active');
-  await page.getByRole('radio', { name: 'Text' }).click();
+  await page.locator('.interview-mode label').filter({ hasText: 'Type' }).click();
   await page.getByRole('button', { name: 'Stop voice and switch' }).click();
   await page.getByLabel('Add to your story').waitFor();
   await page.waitForFunction(() => window.liveTracks.every((track) => track.readyState === 'ended'));
@@ -81,13 +84,13 @@ try {
   assert.equal(await page.locator('#message').inputValue(), 'An unsent text note.');
   assert.equal(await page.locator('.note-item.confirmed').count(), 1, 'Confirmed Canvas evidence survives switching');
 
-  await page.getByRole('radio', { name: 'Voice' }).click();
+  await page.locator('.interview-mode label').filter({ hasText: 'Speak' }).click();
   await page.locator('.live-voice').getByRole('button', { name: 'Start conversation', exact: true }).click();
   await page.waitForFunction(() => !document.querySelector('.live-actions button[aria-pressed]').disabled);
   await page.getByRole('button', { name: 'Choose a role' }).click();
   await page.waitForFunction(() => window.liveTracks.every((track) => track.readyState === 'ended'));
   await page.getByRole('button', { name: /Back to your story/ }).click();
-  await page.getByRole('radio', { name: 'Text' }).click();
+  await page.locator('.interview-mode label').filter({ hasText: 'Type' }).click();
   assert.equal(await page.getByText('Stop the live voice conversation and switch to Text?', { exact: true }).count(), 0, 'Leaving the interview stops Live and clears active-session state');
 
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('access-candidate-v1')).profile.preferences.interviewMode === 'text');
@@ -96,8 +99,8 @@ try {
   await page.getByRole('button', { name: 'Continue in text', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'Use voice instead' }).count(), 1, 'Saved Text choice is honoured on return');
   await page.getByRole('button', { name: 'Continue in text', exact: true }).click();
-  await page.getByRole('radio', { name: 'Text' }).waitFor();
-  assert.equal(await page.getByRole('radio', { name: 'Text' }).isChecked(), true);
+  await page.getByRole('radio', { name: 'Type' }).waitFor();
+  assert.equal(await page.getByRole('radio', { name: 'Type' }).isChecked(), true);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.deepEqual(await page.evaluate(() => window.liveTracks.map((track) => track.readyState)), [], 'Returning to Text does not request microphone access');
   console.log('Interview mode browser: PASS (exclusive interfaces, saved Text, shared Canvas, collapsed transcript, confirmed Live shutdown)');
@@ -111,11 +114,12 @@ try {
   await mobile.goto(baseURL);
   await mobile.getByRole('radio', { name: /Simple/ }).check();
   await mobile.getByRole('button', { name: 'Start a conversation', exact: true }).click();
-  await mobile.getByRole('button', { name: /Career canvas/ }).click();
-  assert.equal(await mobile.getByRole('radio', { name: 'Voice' }).isVisible(), true, 'Mode control stays accessible on mobile Canvas panel');
+  assert.equal(await mobile.locator('.canvas-companion > summary').isVisible(), true, 'Compact profile summary stays available on mobile');
+  await mobile.locator('.canvas-companion > summary').click();
+  assert.equal(await mobile.locator('.canvas-companion').evaluate((element) => element.open), true, 'Mobile profile expands on request');
+  assert.equal(await mobile.getByRole('radio', { name: 'Speak' }).isVisible(), true, 'Mode control stays accessible while profile is expanded');
   await mobile.screenshot({ path: '/tmp/access-interview-canvas-320.png', fullPage: true });
-  await mobile.getByRole('radio', { name: 'Text' }).click();
-  await mobile.getByRole('button', { name: 'Conversation', exact: true }).click();
+  await mobile.locator('.interview-mode label').filter({ hasText: 'Type' }).click();
   await mobile.getByLabel('Add to your story').waitFor();
   assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'Mobile mode selector and interview have no horizontal overflow');
   await mobile.close();

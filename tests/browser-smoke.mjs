@@ -9,6 +9,13 @@ const browser = await chromium.launch({
   headless: true,
   ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
 });
+async function expandCanvas(page) {
+  const canvas = page.locator('.canvas-companion');
+  if (!await canvas.evaluate((element) => element.open)) {
+    await page.locator('.canvas-companion > summary').focus();
+    await page.keyboard.press('Enter');
+  }
+}
 const baseURL = process.env.ACCESS_TEST_URL || 'http://localhost:3002';
 let failNext = false;
 let release;
@@ -141,7 +148,7 @@ try {
     await page.getByRole('button', { name: 'Retry', exact: true }).focus(); await page.keyboard.press('Enter');
     await page.getByText(/Question 2 of up to/).waitFor();
     assert.equal(await page.locator('.chat-line').count(), 5);
-    if (width <= 650) { await page.getByRole('button', { name: /Career canvas/ }).focus(); await page.keyboard.press('Enter'); }
+    await expandCanvas(page);
     assert.equal(await page.getByLabel('Suggested skill').inputValue(), 'Library volunteering');
     await page.locator('[aria-live="polite"]').filter({ hasText: 'profile suggestion to review are ready' }).waitFor();
     await page.getByText('“volunteer at a library”').waitFor();
@@ -149,7 +156,6 @@ try {
     await page.getByRole('button', { name: 'Approve' }).focus(); await page.keyboard.press('Enter');
     assert.equal(await page.getByLabel('Confirmed skill').inputValue(), 'Visitor support');
     await page.locator('[aria-live="polite"]').filter({ hasText: 'Suggestion confirmed and added to your profile.' }).waitFor();
-    if (width <= 650) { await page.getByRole('button', { name: 'Conversation', exact: true }).focus(); await page.keyboard.press('Enter'); }
     await page.getByRole('button', { name: 'Correct this answer' }).focus(); await page.keyboard.press('Enter');
     await page.getByLabel('Correct your answer').fill('I volunteer at a food bank.');
     await page.getByRole('button', { name: 'Save correction' }).focus(); await page.keyboard.press('Enter');
@@ -177,7 +183,7 @@ try {
     await page.screenshot({ path: `/tmp/access-task02-${width}.png`, fullPage: true });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'No horizontal overflow');
     // Preserve Task 01 canvas, preferences, fictional roles and draft controls.
-    if (width <= 650) { await page.getByRole('button', { name: /Career canvas/ }).focus(); await page.keyboard.press('Enter'); }
+    await expandCanvas(page);
     await page.getByLabel('Add something yourself').fill('Event planning');
     await page.getByRole('button', { name: 'Add confirmed experience' }).focus(); await page.keyboard.press('Enter');
     await page.locator('#cv-file').setInputFiles({ name: 'sample.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nSynthetic test CV') });
@@ -249,9 +255,8 @@ try {
     await activate(page.locator('.preferences summary'));
     await activate(page.getByRole('button', { name: 'Continue in text', exact: true }));
     await page.getByText('What experience would you like to share?', { exact: true }).waitFor();
-    if (width <= 650) await activate(page.getByRole('button', { name: /Career canvas/ }));
+    await expandCanvas(page);
     assert.equal(await page.getByLabel('Confirmed skill').count(), 2);
-    if (width <= 650) await activate(page.getByRole('button', { name: 'Conversation', exact: true }));
     await activate(page.getByRole('button', { name: 'Reset & delete' }));
     assert.equal(await page.getByRole('button', { name: 'I’d rather type' }).isDisabled(), true);
     assert.equal(await page.evaluate(() => localStorage.getItem('access-candidate-v1')), null);

@@ -34,7 +34,6 @@ export default function Home() {
   const [voiceAnswerToReview, setVoiceAnswerToReview] = useState<string | null>(null);
   const [modeNotice, setModeNotice] = useState("");
   const [storageReady, setStorageReady] = useState(false);
-  const [mobilePanel, setMobilePanel] = useState<"conversation" | "canvas">("conversation");
   const [chat, setChat] = useState<ConversationMessage[]>([]);
   const [interview, setInterview] = useState(EMPTY_INTERVIEW);
   const [pending, setPending] = useState(false);
@@ -73,6 +72,10 @@ export default function Home() {
     ...profile.education.map((item) => ({ id: item.id, kind: "education" as const, text: item.text, evidence: item.evidence, confirmed: item.confirmed })),
   ], [profile]);
   const confirmed = useMemo(() => claims.filter((claim) => claim.confirmed), [claims]);
+  const experienceCount = profile.experience.length;
+  const skillCount = profile.skills.length;
+  const reviewCount = claims.length - confirmed.length;
+  const latestClaim = claims.at(-1);
   const [skillDraft, setSkillDraft] = useState("");
   const [cvImportPending, setCvImportPending] = useState(false);
   const [cvImportError, setCvImportError] = useState("");
@@ -366,7 +369,7 @@ export default function Home() {
     activeRequest.current?.abort(); activeRequest.current = null;
     activeCvImport.current?.abort(); activeCvImport.current = null; setCvImportPending(false); setCvImportError("");
     setPending(false); setError(""); setFailedRequest(null); setCorrectionId(null); setInterview(EMPTY_INTERVIEW);
-    setModeSwitchPending(false); setVoiceSessionActive(false); setVoiceAnswerToReview(null); setModeNotice(""); setStep("welcome"); setChat([]); setProfile(emptyProfile()); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setMobilePanel("conversation"); setCv(""); setLetter(""); setDraftJobId(null); setUnverifiedClaims([]); setApplicationError(""); setAnnouncement("Your session has been reset.");
+    setModeSwitchPending(false); setVoiceSessionActive(false); setVoiceAnswerToReview(null); setModeNotice(""); setStep("welcome"); setChat([]); setProfile(emptyProfile()); setSelectedJob(DEMO_JOBS[0].id); setMessage(""); setSkillDraft(""); setCv(""); setLetter(""); setDraftJobId(null); setUnverifiedClaims([]); setApplicationError(""); setAnnouncement("Your session has been reset.");
   }
 
   return (
@@ -422,16 +425,14 @@ export default function Home() {
         </section>}
 
         {step === "story" && <section className="workspace" aria-labelledby="story-heading">
-          <div className="workspace-heading"><div><h1 id="story-heading">Your story, taking shape.</h1><p>Speak or write in your own words. Review what you discover, at your own pace.</p></div><span className="demo-tag"><span /> Gemini interview</span></div>
-          <div className="mobile-switch" role="group" aria-label="Workspace panel"><button aria-pressed={mobilePanel === "conversation"} onClick={() => setMobilePanel("conversation")}>Conversation</button><button aria-pressed={mobilePanel === "canvas"} onClick={() => setMobilePanel("canvas")}>Career canvas <span className="count-pill">{claims.length}</span></button></div>
+          <div className="workspace-heading"><div><h1 id="story-heading">Every experience matters.</h1><p>Take your time. There’s no right or wrong answer.</p></div></div>
           <div className="workspace-grid">
-            <section className={`conversation-pane${mobilePanel === "canvas" ? " mobile-mode-control-only" : ""}`} aria-labelledby="conversation-heading">
-              <div className="pane-heading"><div><h2 id="conversation-heading">In your words</h2></div></div>
+            <section className="conversation-pane" aria-labelledby="story-heading">
               <fieldset className="interview-mode" aria-label="Interview mode">
-                <legend>Choose how to interview</legend>
+                <legend>How would you like to respond?</legend>
                 <div>
-                  <label className={interviewMode === "voice" ? "is-selected" : ""}><input type="radio" name="interview-mode" value="voice" checked={interviewMode === "voice"} onChange={() => selectInterviewMode("voice")} /><span>Voice</span></label>
-                  <label className={interviewMode === "text" ? "is-selected" : ""}><input type="radio" name="interview-mode" value="text" checked={interviewMode === "text"} onChange={() => selectInterviewMode("text")} /><span>Text</span></label>
+                  <label className={interviewMode === "voice" ? "is-selected" : ""}><input type="radio" name="interview-mode" value="voice" aria-label="Speak" checked={interviewMode === "voice"} onChange={() => selectInterviewMode("voice")} /><span>Speak</span></label>
+                  <label className={interviewMode === "text" ? "is-selected" : ""}><input type="radio" name="interview-mode" value="text" aria-label="Type" checked={interviewMode === "text"} onChange={() => selectInterviewMode("text")} /><span>Type</span></label>
                 </div>
               </fieldset>
               {modeNotice && <p className="mode-notice" role="status">{modeNotice}</p>}
@@ -440,8 +441,7 @@ export default function Home() {
                 <p>{voiceAnswerToReview !== null ? "Microphone capture and playback will stop. This transcript will be added to the editable text field." : "Microphone capture and playback will stop. Completed answers and suggestions stay in your Career Canvas; an unfinished answer may not be saved."}</p>
                 <div><button className="button button-dark" onClick={confirmTextSwitch}>{voiceAnswerToReview !== null ? "Stop voice and review answer" : "Stop voice and switch"}</button><button className="text-button" onClick={cancelTextSwitch}>Keep using Voice</button></div>
               </div>}
-              <div className={mobilePanel === "canvas" ? "mobile-interface-hidden" : ""}>
-              <LiveVoice visible={interviewMode === "voice" && mobilePanel === "conversation"} questionStyle={profile.preferences.questionStyle} available={interviewMode === "voice" && !pending && mobilePanel === "conversation"} onSessionActive={setVoiceSessionActive} onSuggestions={addProfileSuggestions} onUseText={reviewVoiceAnswer} />
+              <LiveVoice visible={interviewMode === "voice"} questionStyle={profile.preferences.questionStyle} available={interviewMode === "voice" && !pending} onSessionActive={setVoiceSessionActive} onSuggestions={addProfileSuggestions} onUseText={reviewVoiceAnswer} />
               {interviewMode === "text" && <>
               <div ref={chatLog} className={`chat-log${!chat.length ? " is-empty" : ""}`} role="region" tabIndex={chat.length ? 0 : -1} aria-label="Conversation history" aria-busy={pending}>
                 {chat.map((line) => <div key={line.id} className={`chat-line ${line.role === "user" ? "you" : "access"}`}><div className="avatar" aria-hidden="true">{line.role === "user" ? (profile.name?.[0] || "Y") : <Mark small />}</div><div><span className="speaker">{line.role === "user" ? "You" : "Access · Gemini"}</span><p>{line.content === CLARIFICATION_REQUEST ? "Could you clarify this question?" : line.content}</p>{line.role === "user" && !["[Question skipped by candidate]", CLARIFICATION_REQUEST].includes(line.content) && <button className="text-button" disabled={pending || interview.status === "ended"} onClick={() => { setCorrectionId(line.id); setMessage(line.content); setError(""); setFailedRequest(null); messageInput.current?.focus(); }}>Correct this answer</button>}</div></div>)}
@@ -455,10 +455,17 @@ export default function Home() {
                 {correctionId && <button className="text-button" disabled={pending} onClick={() => { setCorrectionId(null); setMessage(""); setError(""); setFailedRequest(null); }}>Cancel correction</button>}
               </div>
               </>}
-              </div>
             </section>
 
-            <section className={`canvas-pane${mobilePanel === "conversation" ? " mobile-hidden" : ""}`} aria-labelledby="canvas-heading">
+            <details className="canvas-companion">
+              <summary aria-label={`View career profile. ${experienceCount} experiences, ${skillCount} skills, ${reviewCount} awaiting review`}>
+                <span className="canvas-summary-title">Your career profile</span>
+                <span className="canvas-summary-counts">{experienceCount} {experienceCount === 1 ? "experience" : "experiences"} · {skillCount} {skillCount === 1 ? "skill" : "skills"}</span>
+                <span className={`canvas-summary-review${reviewCount ? " has-review" : ""}`}>{reviewCount ? `${reviewCount} awaiting review` : "No items to review"}</span>
+                {latestClaim && <span className="canvas-summary-latest">Latest: {latestClaim.text}</span>}
+                <span className="canvas-summary-action">View career profile</span>
+              </summary>
+            <section className="canvas-pane" aria-labelledby="canvas-heading">
               <div className="pane-heading canvas-title"><div><div><h2 id="canvas-heading">Career canvas</h2><p>A living draft of what you bring.</p></div></div></div>
               <div className="candidate-line"><span className="candidate-avatar" aria-hidden="true">{profile.name?.slice(0, 1).toUpperCase()}</span><span><label className="sr-only" htmlFor="candidate-name">Candidate name</label><input className="candidate-name" id="candidate-name" placeholder="Your name" value={profile.name ?? ""} onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))} /><small>Your name · optional</small></span><span className="edit-name">Editable</span></div>
               <form className="cv-import" onSubmit={importCv} aria-busy={cvImportPending}>
@@ -481,6 +488,7 @@ export default function Home() {
               <div className="canvas-footnote"><span aria-hidden="true">↳</span> Nothing is included in your draft until you confirm it.</div>
               <button className="button button-dark continue-button" onClick={() => { setStep("application"); setAnnouncement("Choose a fictional role to prepare your draft."); }}>Choose a role <span aria-hidden="true">→</span></button>
             </section>
+            </details>
           </div>
           <p className="demo-disclaimer">Interview questions and application drafts are generated by Gemini. Drafts use only confirmed work-related details that pass sensitive-information screening.</p>
         </section>}

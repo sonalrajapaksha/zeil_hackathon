@@ -45,7 +45,7 @@ try {
     await page.getByRole('radio', { name: /Simple/ }).check();
     await page.getByRole('button', { name: 'I’d rather type' }).click();
     await page.locator('#message').fill('My unsent answer stays here.');
-    await page.getByRole('radio', { name: 'Voice' }).check();
+    await page.locator('.interview-mode label').filter({ hasText: 'Speak' }).click();
     const start = page.getByRole('button', { name: 'Start conversation', exact: true });
     assert.equal(await page.locator('#message').count(), 0, 'Text controls are hidden in Voice mode');
     // Denial preserves candidate input and allows immediate text fallback.
@@ -53,10 +53,10 @@ try {
     await start.focus(); await page.keyboard.press('Enter');
     await page.getByRole('alert').filter({ hasText: 'Microphone permission was not granted' }).waitFor();
     assert.equal(await page.locator('.voice-signal svg').evaluate((el) => getComputedStyle(el).stroke), 'rgb(180, 35, 44)', 'Microphone denial turns the signal red');
-    await page.getByRole('radio', { name: 'Text' }).check();
+    await page.locator('.interview-mode label').filter({ hasText: 'Type' }).click();
     assert.equal(await page.locator('#message').inputValue(), 'My unsent answer stays here.');
     await page.evaluate(() => { window.denyMic = false; });
-    await page.getByRole('radio', { name: 'Voice' }).check();
+    await page.locator('.interview-mode label').filter({ hasText: 'Speak' }).click();
     tokenFails = true;
     await start.click();
     await page.getByRole('alert').filter({ hasText: 'Voice is unavailable' }).waitFor();
@@ -123,7 +123,7 @@ try {
     // Stop must cancel a pending socket even before Gemini sends setupComplete.
     holdSetup = true;
     const setupCount = messages.filter((message) => message.setup).length;
-    await page.getByRole('radio', { name: 'Voice' }).check();
+    await page.locator('.interview-mode label').filter({ hasText: 'Speak' }).click();
     await start.click();
     await page.getByText('Connecting to Gemini Live.', { exact: true }).waitFor();
     for (let attempt = 0; attempt < 50 && messages.filter((message) => message.setup).length === setupCount; attempt++) await page.waitForTimeout(100);
@@ -131,27 +131,27 @@ try {
     await page.getByRole('button', { name: 'Stop voice' }).click();
     await page.waitForFunction(() => window.liveTracks.every((track) => track.readyState === 'ended'));
     assert.equal(closed, true);
-    await page.getByRole('radio', { name: 'Text' }).check();
+    await page.locator('.interview-mode label').filter({ hasText: 'Type' }).click();
     assert.equal(await page.locator('#message').inputValue(), 'My unsent answer stays here.\n\nI helped library visitors.');
     holdSetup = false;
     // Remote closure is recoverable, then Reset releases the next session.
-    await page.getByRole('radio', { name: 'Voice' }).check();
+    await page.locator('.interview-mode label').filter({ hasText: 'Speak' }).click();
     await start.click();
     await page.waitForFunction(() => !document.querySelector('.live-actions button[aria-pressed]').disabled);
     socket.close({ code: 1011, reason: 'fixture provider failure' });
     await page.getByText('Voice connection ended. Retry voice or continue by text.', { exact: true }).waitFor();
-    await page.getByRole('radio', { name: 'Text' }).check();
+    await page.locator('.interview-mode label').filter({ hasText: 'Type' }).click();
     assert.equal(await page.locator('#message').inputValue(), 'My unsent answer stays here.\n\nI helped library visitors.');
-    await page.getByRole('radio', { name: 'Voice' }).check();
+    await page.locator('.interview-mode label').filter({ hasText: 'Speak' }).click();
     await start.click();
     await page.waitForFunction(() => !document.querySelector('.live-actions button[aria-pressed]').disabled);
     await page.locator('.preferences summary').click();
     await page.getByRole('radio', { name: 'Standard', exact: true }).check();
     await page.waitForFunction(() => window.liveTracks.every((track) => track.readyState === 'ended'));
-    await page.getByRole('radio', { name: 'Text' }).check();
-    assert.equal(await page.locator('#message').inputValue(), 'My unsent answer stays here.\n\nI helped library visitors.');
-    await page.getByRole('radio', { name: 'Voice' }).check();
     await page.locator('.preferences summary').click();
+    await page.locator('.interview-mode label').filter({ hasText: 'Type' }).click();
+    assert.equal(await page.locator('#message').inputValue(), 'My unsent answer stays here.\n\nI helped library visitors.');
+    await page.locator('.interview-mode label').filter({ hasText: 'Speak' }).click();
     await start.click();
     await page.waitForFunction(() => !document.querySelector('.live-actions button[aria-pressed]').disabled);
     await page.getByRole('button', { name: 'Reset & delete' }).click();

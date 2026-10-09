@@ -7,6 +7,15 @@ Current milestone: M2 conversational AI; live Gemini flow verified. No ZEIL bonu
 - **Checks:** `npm run typecheck` PASS; `npm run build` PASS.
 - **Next:** no follow-up task; if the warning persists, verify in a clean browser profile with extensions disabled.
 
+## Minimal interview redesign — 2026-10-09
+
+- **PASS:** simplified the interview stage with one editorial heading, a Speak/Type selector, a single active interview interface and concise consent text. Speak remains the default for new profiles; saved mode preference and existing APIs are unchanged. Recording still starts only after the candidate presses **Start conversation**.
+- **PASS:** the full Career Canvas now opens from a compact live summary showing experience and skill counts, pending-review count and the most recent profile item. The summary stays closed when evidence arrives and follows the interview on mobile. Its existing editing, approval, removal, manual addition, PDF import and job handoff remain available. The transcript remains collapsed until requested.
+- **Changed files:** `src/app/page.tsx`, `src/app/styles.css`, `src/components/LiveVoice.tsx`, `tests/browser-smoke.mjs`, `tests/redesign-browser.mjs`, `tests/interview-mode-browser.mjs`, `tests/live-browser.mjs`, `tests/voice-canvas-browser.mjs`, `docs/DESIGN.md`, `docs/ACCESSIBILITY.md`, `docs/ARCHITECTURE.md`, and this log. No provider route, API contract, Gemini Live transport or evidence extraction logic changed.
+- **Checks:** `npm run typecheck` PASS; `npm test` PASS (36); `npm run build` PASS; `git diff --check` PASS. `browser-smoke` PASS at 320/640/1280; `redesign-browser` PASS at 1440/1024/768/390/320 including keyboard Canvas disclosure; `interview-mode-browser` PASS desktop/320; synthetic `live-browser` PASS at all five widths; `voice-canvas-browser` PASS at 1280/320 including live summary counts, grounded pending evidence, approval and downstream export. Genuine `npm run test:gemini`, `npm run test:voice-profile-gemini`, and `npm run test:live-gemini` PASS. No lint script is configured.
+- **Limitations:** browser voice checks use a synthetic microphone and deterministic WebSocket. Genuine Live smoke verifies token, WebSocket setup and native PCM response, but not human speech or heard playback. Manual VoiceOver/NVDA, physical microphone and actual 200% zoom remain outstanding; no WCAG conformance claim is made.
+- **Next:** commit this implementation; then complete the outstanding manual screen-reader, physical microphone and zoom checks when available.
+
 | Task | Status | Commit | Verification | Blockers |
 |---|---|---|---|---|
 | 01 | PASS (UI/build); visual screenshot QA unavailable | `fc779a3` | `npm run typecheck` PASS; `npm run build` PASS; local `curl` HTTP 200 | Browser-control tool unavailable in this session, so desktop/mobile screenshots and interactive browser QA remain outstanding |
